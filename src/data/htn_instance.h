@@ -99,6 +99,8 @@ public:
     HtnInstance(Parameters& params);
     ~HtnInstance();
 
+    NodeHashMap<int, FlatHashSet<int>> getConstantsBySort() const {return _constants_by_sort;}
+
     ParsedProblem* parse(std::string domainFile, std::string problemFile);
 
     USigSet getInitState();
@@ -168,6 +170,8 @@ public:
         for (const int& arg : sig._args) if (isQConstant(arg)) return true;
         return false;
     }
+
+    inline ParsedProblem& getParsedProblem() {return _p;}
 
     bool isUnifiable(const Signature& from, const Signature& to, FlatHashMap<int, int>* substitution = nullptr) {
         if (from._negated != to._negated) return false;

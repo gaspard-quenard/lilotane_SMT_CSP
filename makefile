@@ -3,11 +3,11 @@
 # (see github.com/biotomas/ipasir )
 
 TARGET=$(shell basename "`pwd`")
-IPASIRSOLVER ?= picosat961
+IPASIRSOLVER ?= glucose4
 
 all:
 	mkdir -p build
-	cd build && cmake .. -DCMAKE_BUILD_TYPE=RELEASE -DIPASIRSOLVER=$(IPASIRSOLVER) -DIPASIRDIR=../../sat && make && cp lilotane .. && cd ..
+	cd build && cmake .. -DCMAKE_BUILD_TYPE=DEBUG -DIPASIRSOLVER=$(IPASIRSOLVER) -DIPASIRDIR=lib && make && cp lilotane .. && cd ..
 
 clean:
 	rm -rf $(TARGET) build/

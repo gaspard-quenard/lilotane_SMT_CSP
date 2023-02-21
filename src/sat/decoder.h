@@ -5,6 +5,7 @@
 #include "data/htn_instance.h"
 #include "data/layer.h"
 #include "sat/sat_interface.h"
+#include "sat/smt_interface.h"
 #include "sat/variable_provider.h"
 #include "data/plan.h"
 
@@ -14,11 +15,13 @@ private:
     HtnInstance& _htn;
     std::vector<Layer*>& _layers;
     SatInterface& _sat;
+    SmtInterface& _smt;
     VariableProvider& _vars;
+    bool _useSmt;
 
 public:
-    Decoder(HtnInstance& htn, std::vector<Layer*>& layers, SatInterface& sat, VariableProvider& vars) :
-        _htn(htn), _layers(layers), _sat(sat), _vars(vars) {}
+    Decoder(HtnInstance& htn, std::vector<Layer*>& layers, SatInterface& sat, SmtInterface& smt, VariableProvider& vars, bool useSmt) :
+        _htn(htn), _layers(layers), _sat(sat), _smt(smt), _vars(vars), _useSmt(useSmt) {}
 
     enum PlanExtraction {ALL, PRIMITIVE_ONLY};
     std::vector<PlanItem> extractClassicalPlan(PlanExtraction mode = PRIMITIVE_ONLY) {
@@ -35,15 +38,18 @@ public:
             // Print out the state
             Log::d("PLANDBG %i,%i S ", li, pos);
             for (const auto& [sig, fVar] : finalLayer[pos].getVariableTable(VarType::FACT)) {
-                if (_sat.holds(fVar)) Log::log_notime(Log::V4_DEBUG, "%s ", TOSTR(sig));
+                if (_useSmt &&_smt.holds(fVar)) Log::log_notime(Log::V4_DEBUG, "%s ", TOSTR(sig));
+                else if (!_useSmt && _sat.holds(fVar)) Log::log_notime(Log::V4_DEBUG, "%s ", TOSTR(sig));
+                
             }
             Log::log_notime(Log::V4_DEBUG, "\n");
 
             int chosenActions = 0;
             //State newState = state;
             for (const auto& [sig, aVar] : finalLayer[pos].getVariableTable(VarType::OP)) {
-                if (!_sat.holds(aVar)) continue;
-
+                if (_useSmt && !_smt.holds(aVar)) continue;
+                else if (!_useSmt && !_sat.holds(aVar)) continue;
+                
                 USignature aSig = sig;
                 if (mode == PRIMITIVE_ONLY && !_htn.isAction(aSig)) continue;
 
@@ -102,7 +108,7 @@ public:
 
                 for (const auto& [opSig, v] : l[pos].getVariableTable(VarType::OP)) {
 
-                    if (_sat.holds(v)) {
+                    if ((_useSmt && _smt.holds(v)) || (!_useSmt && _sat.holds(v))) {
 
                         if (_htn.isAction(opSig)) {
                             // Action
@@ -210,8 +216,14 @@ public:
 
     bool value(VarType type, int layer, int pos, const USignature& sig) {
         int v = _vars.getVariable(type, layer, pos, sig);
-        Log::d("VAL %s@(%i,%i)=%i %i\n", TOSTR(sig), layer, pos, v, _sat.holds(v));
-        return _sat.holds(v);
+        if (_useSmt) {
+            Log::d("VAL %s@(%i,%i)=%i %i\n", TOSTR(sig), layer, pos, v, _smt.holds(v));
+            return _smt.holds(v);
+        }
+        else {
+            Log::d("VAL %s@(%i,%i)=%i %i\n", TOSTR(sig), layer, pos, v, _sat.holds(v));
+            return _sat.holds(v);
+        }
     }
 
 
@@ -229,7 +241,7 @@ public:
                 int numSubstitutions = 0;
                 for (int argSubst : _htn.getDomainOfQConstant(arg)) {
                     const USignature& sigSubst = _vars.sigSubstitute(arg, argSubst);
-                    if (_vars.isEncodedSubstitution(sigSubst) && _sat.holds(_vars.varSubstitution(arg, argSubst))) {
+                    if (_vars.isEncodedSubstitution(sigSubst) && (_useSmt && _smt.holds(_vars.varSubstitution(arg, argSubst))) || (!_useSmt && _sat.holds(_vars.varSubstitution(arg, argSubst))) ) {
                         Log::d("SUBSTVAR [%s/%s] TRUE => %s ~~> ", TOSTR(arg), TOSTR(argSubst), TOSTR(sig));
                         numSubstitutions++;
                         Substitution sub;

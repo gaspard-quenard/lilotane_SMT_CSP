@@ -13,3 +13,6 @@ picosat
 PANDA.jar
 logs/
 src/pandaPIparser/
+benchmarks/*
+*.o.d
+build/*

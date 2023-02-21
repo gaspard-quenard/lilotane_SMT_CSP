@@ -38,6 +38,9 @@ public:
     int _num_asmpts = 0;
     int _prev_num_cls = 0;
     int _prev_num_lits = 0;
+    bool is_used = true;
+    std::vector<long long int> time_spend_on_solver_per_layer_ms;
+    long long int total_time_spend_on_solver_ms = 0;
 
 private:
     const char* STAGES_NAMES[21] = {"actionconstraints","actioneffects","atleastoneelement","atmostoneelement",
@@ -89,11 +92,21 @@ public:
         for (const auto& [num, stage] : stagesSorted) {
             Log::i("- %s : %i cls\n", STAGES_NAMES[stage], num);
         }
+        Log::i("Time spend on solver for each layer:\n");
+        int layer = 0;
+        for (const auto& time : time_spend_on_solver_per_layer_ms) {
+            Log::i("%i: %lli ms,\n", layer, time);
+            layer++;
+        }
+        Log::i("total time spend by the solver: %lli ms\n", total_time_spend_on_solver_ms);
         _num_cls_per_stage.clear();
     }
 
     ~EncodingStatistics() {
-        printStages();
+        if (is_used) {
+            printStages();
+        }
+        
     }
 };
 

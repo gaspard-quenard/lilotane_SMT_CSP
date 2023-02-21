@@ -11,6 +11,17 @@ if(NOT IPASIRDIR)
     set(IPASIRDIR "${CMAKE_CURRENT_SOURCE_DIR}/lib")
 endif()
 
+
+if(NOT SMT_SOLVER)
+    set(SMT_SOLVER "cvc5")
+endif()
+if(NOT SMT_DIR)
+    set(SMT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/lib")
+endif()
+
+
+
+
 # Build-specific compile options
 
 set(MY_DEFINITIONS IPASIRSOLVER=\"${IPASIRSOLVER}\")
@@ -29,6 +40,7 @@ endif()
 
 
 # Libraries and includes
+
 
 link_directories(lib ${IPASIRDIR}/${IPASIRSOLVER} build)
 set(BASE_LIBS ${MPI_CXX_LIBRARIES} ${MPI_CXX_LINK_FLAGS} m z pandaPIparser)
@@ -66,6 +78,23 @@ target_include_directories(lilotane PRIVATE ${BASE_INCLUDES})
 target_compile_options(lilotane PRIVATE ${BASE_COMPILEFLAGS})
 target_compile_definitions(lilotane PRIVATE ${MY_DEFINITIONS})
 
+
+
+#########################################################################################################################
+### Add CVC5 library
+target_include_directories(lotane PUBLIC "lib/cvc5/src/api/cpp/" "lib/cvc5/build/src/" "lib/cvc5/src/")
+# link_directories("lib/cvc5/build/src/")
+target_link_libraries(lotane PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/lib/cvc5/build/src/libcvc5.so")
+
+
+### Add z3 library
+target_include_directories(lotane PUBLIC "lib/z3/src/api/c++/" "lib/z3/src/api")
+# link_directories("lib/z3/build/src/api/c++/")
+target_link_libraries(lotane PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/lib/z3/build/libz3.so")
+#########################################################################################################################
+
+
+
 if("${SOLVERLIBS}" MATCHES ".*dummyfuncs.*")
     # "dummyfuncs" library for unimplemented extra IPASIR functions
     add_library(dummyfuncs
@@ -79,6 +108,7 @@ else()
 endif()
 
 
+
 # PandaPIparser
 
 add_custom_target(parser cd ../src/ && bash fetch_and_build_parser.sh)
@@ -89,7 +119,6 @@ add_dependencies(lotane parser)
 
 add_custom_target(solverlib cd .. && cd ${IPASIRDIR}/${IPASIRSOLVER}/ && [ ! -f fetch_and_build.sh ] || bash fetch_and_build.sh)
 add_dependencies(lilotane solverlib)
-
 
 # Global debug flags
 

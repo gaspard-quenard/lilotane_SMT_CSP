@@ -17,6 +17,7 @@ namespace Names {
     std::string to_string(const std::vector<IntPair>& nameIds);
     std::string to_string(const USignature& sig);
     std::string to_string(const Signature& sig);
+    std::string to_SMT_string(const USignature& sig);
     std::string to_string(const PositionedUSig& sig);
     std::string to_string_nobrackets(const USignature& sig);
     std::string to_string(const FlatHashMap<int, int>& s);
@@ -25,6 +26,8 @@ namespace Names {
     std::string to_string(const USigSet& set);
     std::string to_string(const FactFrame& f);
     std::string to_string(const Substitution& s);
+
+    std::string to_string_without_invalid_SMT_symbols(int nameId);
 }
 
 #endif

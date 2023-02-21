@@ -72,6 +72,7 @@ void Parameters::setDefaults() {
     setParam("aar", "1"); // acknowledge action repetitions
     setParam("vp", "0"); // verify plan before printing it
     setParam("wf", "0"); // output formula to f.cnf
+    setParam("smt", "0"); // use SMT encoding
 }
 
 void Parameters::printUsage() {

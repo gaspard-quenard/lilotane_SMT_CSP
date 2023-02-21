@@ -1,10 +1,13 @@
 
 #include <random>
+#include <vector>
+#include <string>
 
 #include "sat/encoding.h"
 #include "sat/literal_tree.h"
 #include "sat/binary_amo.h"
 #include "sat/dnf2cnf.h"
+#include "sat/variable_provider.h"
 #include "util/log.h"
 #include "util/timer.h"
 
@@ -64,9 +67,9 @@ void Encoding::encode(size_t layerIdx, size_t pos) {
     const USigSet& axiomaticOps = newPos.getAxiomaticOps();
     if (!axiomaticOps.empty()) {
         for (const USignature& op : axiomaticOps) {
-            _sat.appendClause(_vars.getVariable(VarType::OP, newPos, op));
+            __interfaceSolver__appendClause(_vars.getVariable(VarType::OP, newPos, op));
         }
-        _sat.endClause();
+        __interfaceSolver__endClause();
     }
     _stats.end(STAGE_AXIOMATICOPS);
 
@@ -80,7 +83,8 @@ void Encoding::encodeOperationVariables(Position& newPos) {
 
     _stats.begin(STAGE_ACTIONCONSTRAINTS);
     for (const auto& aSig : newPos.getActions()) {
-        int aVar = _vars.encodeVariable(VarType::OP, newPos, aSig);
+        // int aVar = _vars.encodeVariable(VarType::OP, newPos, aSig);
+        int aVar = __interfaceSolver__encodeVariable(VarType::OP, newPos, aSig);(VarType::OP, newPos, aSig);
 
         // If the action occurs, the position is primitive
         _primitive_ops.push_back(aVar);
@@ -89,7 +93,8 @@ void Encoding::encodeOperationVariables(Position& newPos) {
 
     _stats.begin(STAGE_REDUCTIONCONSTRAINTS);
     for (const auto& rSig : newPos.getReductions()) {
-        int rVar = _vars.encodeVariable(VarType::OP, newPos, rSig);
+        // int rVar = _vars.(VarType::OP, newPos, rSig);
+        int rVar = __interfaceSolver__encodeVariable(VarType::OP, newPos, rSig);
 
         bool trivialReduction = _htn.getOpTable().getReduction(rSig).getSubtasks().size() == 0;
         if (trivialReduction) {
@@ -115,18 +120,19 @@ void Encoding::encodeOperationVariables(Position& newPos) {
         return;
     }
 
-    int varPrim = _vars.encodeVarPrimitive(newPos.getLayerIndex(), newPos.getPositionIndex());
+    // int varPrim = _vars.encodeVarPrimitive(newPos.getLayerIndex(), newPos.getPositionIndex());
+    int varPrim = __interfaceSolver__encodeVarPrimitive(newPos.getLayerIndex(), newPos.getPositionIndex());
 
     _stats.begin(STAGE_REDUCTIONCONSTRAINTS);
     if (_primitive_ops.empty()) {
         // Only non-primitive ops here
-        _sat.addClause(-varPrim);
+        __interfaceSolver__addClause(-varPrim);
     } else {
         // Mix of primitive and non-primitive ops (default)
         _stats.begin(STAGE_ACTIONCONSTRAINTS);
-        for (int aVar : _primitive_ops) _sat.addClause(-aVar, varPrim);
+        for (int aVar : _primitive_ops) __interfaceSolver__addClause(-aVar, varPrim);
         _stats.end(STAGE_ACTIONCONSTRAINTS);
-        for (int rVar : _nonprimitive_ops) _sat.addClause(-rVar, -varPrim);
+        for (int rVar : _nonprimitive_ops) __interfaceSolver__addClause(-rVar, -varPrim);
     }
     _stats.end(STAGE_REDUCTIONCONSTRAINTS);
 }
@@ -149,7 +155,9 @@ void Encoding::encodeFactVariables(Position& newPos, Position& left, Position& a
         const USigSet* defFacts[] = {&newPos.getTrueFacts(), &newPos.getFalseFacts()};
         for (auto set : defFacts) for (const auto& fact : *set) {
             if (!newPos.hasVariable(VarType::FACT, fact) && _analysis.isRelevant(fact)) 
-                _new_fact_vars.insert(_vars.encodeVariable(VarType::FACT, newPos, fact));
+                // _new_fact_vars.insert(_vars.encodeVariable(VarType::FACT, newPos, fact));
+                _new_fact_vars.insert(__interfaceSolver__encodeVariable(VarType::FACT, newPos, fact));
+            
         }
     } else {
         // Encode frame axioms which will assign variables to all ground facts
@@ -195,7 +203,8 @@ void Encoding::encodeFactVariables(Position& newPos, Position& left, Position& a
 
             } else {
                 // Encode new variable
-                _new_fact_vars.insert(_vars.encodeVariable(VarType::FACT, newPos, qfact));
+                // _new_fact_vars.insert(_vars.encodeVariable(VarType::FACT, newPos, qfact));
+                _new_fact_vars.insert(__interfaceSolver__encodeVariable(VarType::FACT, newPos, qfact));
             }
         }
     }
@@ -210,10 +219,10 @@ void Encoding::encodeFactVariables(Position& newPos, Position& left, Position& a
         int var = newPos.getVariableOrZero(VarType::FACT, factSig);
         if (var == 0) {
             // Variable is not encoded yet.
-            _sat.addClause((i == 0 ? 1 : -1) * _vars.encodeVariable(VarType::FACT, newPos, factSig));
+            __interfaceSolver__addClause((i == 0 ? 1 : -1) * __interfaceSolver__encodeVariable(VarType::FACT, newPos, factSig));
         } else {
             // Variable is already encoded. If the variable is new, constrain it.
-            if (_new_fact_vars.count(var)) _sat.addClause((i == 0 ? 1 : -1) * var);
+            if (_new_fact_vars.count(var)) __interfaceSolver__addClause((i == 0 ? 1 : -1) * var);
         }
         Log::d("(%i,%i) DEFFACT %s\n", _layer_idx, _pos, TOSTR(factSig));
     }
@@ -284,7 +293,8 @@ void Encoding::encodeFrameAxioms(Position& newPos, Position& left) {
                 newPos.setVariable(VarType::FACT, fact, var);
             } else {
                 // There is some support for this fact -- need to encode new var
-                int v = _vars.encodeVariable(VarType::FACT, newPos, fact);
+                // int v = _vars.encodeVariable(VarType::FACT, newPos, fact);
+                int v = __interfaceSolver__encodeVariable(VarType::FACT, newPos, fact);
                 _new_fact_vars.insert(v);
                 factVar = v;
             }
@@ -344,7 +354,7 @@ void Encoding::encodeFrameAxioms(Position& newPos, Position& left) {
                     if (virtOpVar != 0) cls.push_back(virtOpVar);
                 }
             }
-            _sat.addClause(cls);
+            __interfaceSolver__addClause(cls);
         }
     }
     _stats.end(STAGE_DIRECTFRAMEAXIOMS);
@@ -361,12 +371,12 @@ void Encoding::encodeIndirectFrameAxioms(const std::vector<int>& headerLits, int
             
     // Transform header and tree into a set of clauses
     for (const auto& cls : tree.encode()) {
-        for (int lit : headerLits) _sat.appendClause(lit);
-        _sat.appendClause(-opVar);
+        for (int lit : headerLits) __interfaceSolver__appendClause(lit);
+        __interfaceSolver__appendClause(-opVar);
         for (const auto& [src, dest] : cls) {
-            _sat.appendClause((src<0 ? -1 : 1) * _vars.varSubstitution(std::abs(src), dest));
+            __interfaceSolver__appendClause((src<0 ? -1 : 1) * __interfaceSolver__varSubstitution(std::abs(src), dest));
         }
-        _sat.endClause();
+        __interfaceSolver__endClause();
     }
     
     _stats.end(STAGE_INDIRECTFRAMEAXIOMS);
@@ -394,7 +404,7 @@ void Encoding::encodeOperationConstraints(Position& newPos) {
         // Preconditions
         for (const Signature& pre : _htn.getOpTable().getAction(aSig).getPreconditions()) {
             if (!_vars.isEncoded(VarType::FACT, layerIdx, pos, pre._usig)) continue;
-            _sat.addClause(-aVar, (pre._negated?-1:1)*_vars.getVariable(VarType::FACT, newPos, pre._usig));
+            __interfaceSolver__addClause(-aVar, (pre._negated?-1:1)*_vars.getVariable(VarType::FACT, newPos, pre._usig));
         }
     }
     _stats.end(STAGE_ACTIONCONSTRAINTS);
@@ -408,7 +418,7 @@ void Encoding::encodeOperationConstraints(Position& newPos) {
         // Preconditions
         for (const Signature& pre : _htn.getOpTable().getReduction(rSig).getPreconditions()) {
             if (!_vars.isEncoded(VarType::FACT, layerIdx, pos, pre._usig)) continue;
-            _sat.addClause(-rVar, (pre._negated?-1:1)*_vars.getVariable(VarType::FACT, newPos, pre._usig));
+            __interfaceSolver__addClause(-rVar, (pre._negated?-1:1)*_vars.getVariable(VarType::FACT, newPos, pre._usig));
         }
     }
     _stats.end(STAGE_REDUCTIONCONSTRAINTS);
@@ -423,7 +433,7 @@ void Encoding::encodeOperationConstraints(Position& newPos) {
 
         _stats.begin(STAGE_ATMOSTONEELEMENT);
         auto bamo = BinaryAtMostOne(elementVars, elementVars.size()+1);
-        for (const auto& c : bamo.encode()) _sat.addClause(c);
+        for (const auto& c : bamo.encode()) __interfaceSolver__addClause(c);
         _stats.end(STAGE_ATMOSTONEELEMENT);
 
     } else {
@@ -432,7 +442,7 @@ void Encoding::encodeOperationConstraints(Position& newPos) {
         _stats.begin(STAGE_ATMOSTONEELEMENT);
         for (size_t i = 0; i < elementVars.size(); i++) {
             for (size_t j = i+1; j < elementVars.size(); j++) {
-                _sat.addClause(-elementVars[i], -elementVars[j]);
+                __interfaceSolver__addClause(-elementVars[i], -elementVars[j]);
             }
         }
         _stats.end(STAGE_ATMOSTONEELEMENT);
@@ -454,7 +464,8 @@ void Encoding::encodeSubstitutionVars(const USignature& opSig, int opVar, int ar
         assert(!_htn.isVariable(c));
 
         // either of the possible substitutions must be chosen
-        int varSubst = _vars.varSubstitution(arg, c);
+        // int varSubst = _vars.varSubstitution(arg, c);
+        int varSubst = __interfaceSolver__varSubstitution(arg, c);
         substitutionVars.push_back(varSubst);
         //Log::log_notime(Log::V4_DEBUG, "%s ", TOSTR(sigSubstitute(arg, c)));
     }
@@ -462,20 +473,20 @@ void Encoding::encodeSubstitutionVars(const USignature& opSig, int opVar, int ar
     assert(!substitutionVars.empty());
 
     // AT LEAST ONE substitution, or the parent op does NOT occur
-    _sat.appendClause(-opVar);
-    for (int vSub : substitutionVars) _sat.appendClause(vSub);
-    _sat.endClause();
+    __interfaceSolver__appendClause(-opVar);
+    for (int vSub : substitutionVars) __interfaceSolver__appendClause(vSub);
+    __interfaceSolver__endClause();
 
     // AT MOST ONE substitution
     if ((int)substitutionVars.size() >= _params.getIntParam("bamot")) {
         // Binary at-most-one
         auto bamo = BinaryAtMostOne(substitutionVars, substitutionVars.size()+1);
-        for (const auto& c : bamo.encode()) _sat.addClause(c);
+        for (const auto& c : bamo.encode()) __interfaceSolver__addClause(c);
     } else {
         // Naive at-most-one
         for (int vSub1 : substitutionVars) {
             for (int vSub2 : substitutionVars) {
-                if (vSub1 < vSub2) _sat.addClause(-vSub1, -vSub2);
+                if (vSub1 < vSub2) __interfaceSolver__addClause(-vSub1, -vSub2);
             }
         }
     }
@@ -530,7 +541,8 @@ void Encoding::encodeQFactSemantics(Position& newPos) {
                 for (size_t i = 0; i < qfactSig._args.size(); i++) {
                     if (qfactSig._args[i] != decFactSig._args[i])
                         substitutionVars.push_back(
-                            _vars.varSubstitution(qfactSig._args[i], decFactSig._args[i])
+                            // _vars.varSubstitution(qfactSig._args[i], decFactSig._args[i])
+                            __interfaceSolver__varSubstitution(qfactSig._args[i], decFactSig._args[i])
                         );
                 }
                 
@@ -538,10 +550,10 @@ void Encoding::encodeQFactSemantics(Position& newPos) {
                 // the q-fact and the corresponding actual fact are equivalent
                 //Log::v("QFACTSEM (%i,%i) %s -> %s\n", _layer_idx, _pos, TOSTR(qfactSig), TOSTR(decFactSig));
                 for (const int& varSubst : substitutionVars) {
-                    _sat.appendClause(-varSubst);
+                    __interfaceSolver__appendClause(-varSubst);
                 }
-                _sat.appendClause(-sign*qfactVar, sign*decFactVar);
-                _sat.endClause();
+                __interfaceSolver__appendClause(-sign*qfactVar, sign*decFactVar);
+                __interfaceSolver__endClause();
                 substitutionVars.clear();
             }
         }
@@ -582,10 +594,12 @@ void Encoding::encodeActionEffects(Position& newPos, Position& left) {
                                 s.insert(encodeQConstEquality(effArg, posEffArg));
                             } else if (effIsQ) {
                                 if (!_htn.getDomainOfQConstant(effArg).count(posEffArg)) fits = false;
-                                else s.insert(_vars.varSubstitution(effArg, posEffArg));
+                                // else s.insert(_vars.varSubstitution(effArg, posEffArg));
+                                else s.insert(__interfaceSolver__varSubstitution(effArg, posEffArg));
                             } else if (posEffIsQ) {
                                 if (!_htn.getDomainOfQConstant(posEffArg).count(effArg)) fits = false;
-                                else s.insert(_vars.varSubstitution(posEffArg, effArg));
+                                // else s.insert(_vars.varSubstitution(posEffArg, effArg));
+                                else s.insert(__interfaceSolver__varSubstitution(posEffArg, effArg));
                             } else fits = false;
                         }
                     }
@@ -600,7 +614,7 @@ void Encoding::encodeActionEffects(Position& newPos, Position& left) {
             if (unifiedUnconditionally) continue; // Always unified
             if (unifiersDnf.empty()) {
                 // Positive or ununifiable negative effect: enforce it
-                _sat.addClause(-aVar, (eff._negated?-1:1)*_vars.getVariable(VarType::FACT, newPos, eff._usig));
+                __interfaceSolver__addClause(-aVar, (eff._negated?-1:1)*_vars.getVariable(VarType::FACT, newPos, eff._usig));
                 continue;
             }
 
@@ -611,7 +625,7 @@ void Encoding::encodeActionEffects(Position& newPos, Position& left) {
                 std::vector<int> headerLits;
                 headerLits.push_back(aVar);
                 headerLits.push_back(_vars.getVariable(VarType::FACT, newPos, eff._usig));
-                for (const auto& cls : tree.encode(headerLits)) _sat.addClause(cls);
+                for (const auto& cls : tree.encode(headerLits)) __interfaceSolver__addClause(cls);
             } else {
                 std::vector<int> dnf;
                 for (const auto& set : unifiersDnf) {
@@ -620,9 +634,9 @@ void Encoding::encodeActionEffects(Position& newPos, Position& left) {
                 }
                 auto cnf = Dnf2Cnf::getCnf(dnf);
                 for (const auto& clause : cnf) {
-                    _sat.appendClause(-aVar, -_vars.getVariable(VarType::FACT, newPos, eff._usig));
-                    for (int lit : clause) _sat.appendClause(lit);
-                    _sat.endClause();
+                    __interfaceSolver__appendClause(-aVar, -_vars.getVariable(VarType::FACT, newPos, eff._usig));
+                    for (int lit : clause) __interfaceSolver__appendClause(lit);
+                    __interfaceSolver__endClause();
                 }
             }
         }
@@ -645,15 +659,15 @@ void Encoding::encodeQConstraints(Position& newPos) {
 
                 if (positiveConstraint) {
                     // EITHER of the GOOD constants - one big clause
-                    _sat.appendClause(-opVar);
+                    __interfaceSolver__appendClause(-opVar);
                     for (int cnst : c.constants) {
-                        _sat.appendClause(_vars.varSubstitution(qconst, cnst));
+                        __interfaceSolver__appendClause(__interfaceSolver__varSubstitution(qconst, cnst));
                     }
-                    _sat.endClause();
+                    __interfaceSolver__endClause();
                 } else {
                     // NEITHER of the BAD constants - many 2-clauses
                     for (int cnst : c.constants) {
-                        _sat.addClause(-opVar, -_vars.varSubstitution(qconst, cnst));
+                        __interfaceSolver__addClause(-opVar, -__interfaceSolver__varSubstitution(qconst, cnst));
                     }
                 }
             }
@@ -677,15 +691,15 @@ void Encoding::encodeQConstraints(Position& newPos) {
             for (const auto& cls : f) {
                 //std::string out = (polarity == SubstitutionConstraint::ANY_VALID ? "+" : "-") + std::string("SUBSTITUTION ") 
                 //        + Names::to_string(opSig) + " ";
-                _sat.appendClause(-_vars.getVariable(VarType::OP, newPos, opSig));
+                __interfaceSolver__appendClause(-_vars.getVariable(VarType::OP, newPos, opSig));
                 for (const auto& [qArg, decArg] : cls) {
                     bool negated = qArg < 0;
                     //out += (negated ? "-" : "+")
                     //        + Names::to_string(involvedQConsts[idx]) + "/" + Names::to_string(std::abs(lit)) + " ";
-                    _sat.appendClause((polarity == SubstitutionConstraint::NO_INVALID ? -1 : (negated ? -1 : 1)) 
-                            * _vars.varSubstitution(std::abs(qArg), decArg));
+                    __interfaceSolver__appendClause((polarity == SubstitutionConstraint::NO_INVALID ? -1 : (negated ? -1 : 1)) 
+                            * __interfaceSolver__varSubstitution(std::abs(qArg), decArg));
                 }
-                _sat.endClause();
+                __interfaceSolver__endClause();
                 //out += "\n";
                 //Log::d(out.c_str());
             }
@@ -710,12 +724,12 @@ void Encoding::encodeSubtaskRelationships(Position& newPos, Position& above) {
     for (const auto& [parent, children] : newPos.getExpansions()) {
 
         int parentVar = _vars.getVariable(VarType::OP, above, parent);
-        _sat.appendClause(-parentVar);
+        __interfaceSolver__appendClause(-parentVar);
         for (const USignature& child : children) {
             assert(child != Sig::NONE_SIG);
-            _sat.appendClause(_vars.getVariable(VarType::OP, newPos, child));
+            __interfaceSolver__appendClause(_vars.getVariable(VarType::OP, newPos, child));
         }
-        _sat.endClause();
+        __interfaceSolver__endClause();
 
         if (newPos.getExpansionSubstitutions().count(parent)) {
             for (const auto& [child, s] : newPos.getExpansionSubstitutions().at(parent)) {
@@ -730,9 +744,9 @@ void Encoding::encodeSubtaskRelationships(Position& newPos, Position& above) {
                     //Log::d("DOM %s->%s : Enforce %s only to take values from domain of %s\n", TOSTR(parent), TOSTR(child), TOSTR(dest), TOSTR(src));
 
                     if (!_htn.isQConstant(src)) {
-                        _sat.addClause(-parentVar, -childVar, _vars.varSubstitution(dest, src));
+                        __interfaceSolver__addClause(-parentVar, -childVar, __interfaceSolver__varSubstitution(dest, src));
                     } else {
-                        _sat.addClause(-parentVar, -childVar, encodeQConstEquality(dest, src));
+                        __interfaceSolver__addClause(-parentVar, -childVar, encodeQConstEquality(dest, src));
                     }
                 }
             }
@@ -745,11 +759,11 @@ void Encoding::encodeSubtaskRelationships(Position& newPos, Position& above) {
         _stats.begin(STAGE_PREDECESSORS);
         for (const auto& [child, parents] : newPos.getPredecessors()) {
 
-            _sat.appendClause(-_vars.getVariable(VarType::OP, newPos, child));
+            __interfaceSolver__appendClause(-_vars.getVariable(VarType::OP, newPos, child));
             for (const USignature& parent : parents) {
-                _sat.appendClause(_vars.getVariable(VarType::OP, above, parent));
+                __interfaceSolver__appendClause(_vars.getVariable(VarType::OP, above, parent));
             }
-            _sat.endClause();
+            __interfaceSolver__endClause();
         }
         _stats.end(STAGE_PREDECESSORS);
     }
@@ -769,23 +783,23 @@ int Encoding::encodeQConstEquality(int q1, int q2) {
             if (_htn.getDomainOfQConstant(q1).count(c)) continue;
             bad2.insert(c);
         }
-        int varEq = _vars.encodeQConstantEqualityVar(q1, q2);
+        int varEq = __interfaceSolver__encodeQConstantEqualityVar(q1, q2);
         if (good.empty()) {
             // Domains are incompatible -- equality never holds
-            _sat.addClause(-varEq);
+            __interfaceSolver__addClause(-varEq);
         } else {
             // If equality, then all "good" substitution vars are equivalent
             for (int c : good) {
-                int v1 = _vars.varSubstitution(q1, c);
-                int v2 = _vars.varSubstitution(q2, c);
-                _sat.addClause(-varEq, v1, -v2);
-                _sat.addClause(-varEq, -v1, v2);
+                int v1 = __interfaceSolver__varSubstitution(q1, c);
+                int v2 = __interfaceSolver__varSubstitution(q2, c);
+                __interfaceSolver__addClause(-varEq, v1, -v2);
+                __interfaceSolver__addClause(-varEq, -v1, v2);
             }
             // If any of the GOOD ones, then equality
-            for (int c : good) _sat.addClause(-_vars.varSubstitution(q1, c), -_vars.varSubstitution(q2, c), varEq);
+            for (int c : good) __interfaceSolver__addClause(-__interfaceSolver__varSubstitution(q1, c), -__interfaceSolver__varSubstitution(q2, c), varEq);
             // If any of the BAD ones, then inequality
-            for (int c : bad1) _sat.addClause(-_vars.varSubstitution(q1, c), -varEq);
-            for (int c : bad2) _sat.addClause(-_vars.varSubstitution(q2, c), -varEq);
+            for (int c : bad1) __interfaceSolver__addClause(-__interfaceSolver__varSubstitution(q1, c), -varEq);
+            for (int c : bad2) __interfaceSolver__addClause(-__interfaceSolver__varSubstitution(q2, c), -varEq);
         }
         _stats.end(STAGE_QCONSTEQUALITY);
     }
@@ -797,9 +811,9 @@ void Encoding::addAssumptions(int layerIdx, bool permanent) {
     if (_implicit_primitiveness) {
         _stats.begin(STAGE_ACTIONCONSTRAINTS);
         for (size_t pos = 0; pos < l.size(); pos++) {
-            _sat.appendClause(-_vars.encodeVarPrimitive(layerIdx, pos));
-            for (int var : _primitive_ops) _sat.appendClause(var);
-            _sat.endClause();
+            __interfaceSolver__appendClause(-__interfaceSolver__encodeVarPrimitive(layerIdx, pos));
+            for (int var : _primitive_ops) __interfaceSolver__appendClause(var);
+            __interfaceSolver__endClause();
         }
         _stats.end(STAGE_ACTIONCONSTRAINTS);
     }
@@ -807,8 +821,8 @@ void Encoding::addAssumptions(int layerIdx, bool permanent) {
         _stats.begin(STAGE_ASSUMPTIONS);
         int v = _vars.getVarPrimitiveOrZero(layerIdx, pos);
         if (v != 0) {
-            if (permanent) _sat.addClause(v);
-            else _sat.assume(v);
+            if (permanent) __interfaceSolver__addClause(v);
+            else __interfaceSolver__assume(v);
         }
         _stats.end(STAGE_ASSUMPTIONS);
     }
@@ -825,14 +839,22 @@ void onClauseLearnt(void* state, int* cls) {
 }
 
 int Encoding::solve() {
-    Log::i("Attempting to solve formula with %i clauses (%i literals) and %i assumptions\n", 
-                _stats._num_cls, _stats._num_lits, _stats._num_asmpts);
+
+    if (_useSMTSolver) {
+        Log::i("Attempting to solve formula with %i clauses (%i literals) %i assumptions and %i variables\n", 
+            _smt_stats._num_cls, _smt_stats._num_lits, _smt_stats._num_asmpts, VariableDomain::getMaxVar());
+    }
+    else {
+        Log::i("Attempting to solve formula with %i clauses (%i literals) %i assumptions and %i variables\n", 
+            _stats._num_cls, _stats._num_lits, _stats._num_asmpts, VariableDomain::getMaxVar());
+    }
+
     
     if (_params.isNonzero("plc"))
         _sat.setLearnCallback(/*maxLength=*/100, this, onClauseLearnt);
 
     _sat_call_start_time = Timer::elapsedSeconds();
-    int result = _sat.solve();
+    int result = __interfaceSolver__solve();
     _sat_call_start_time = 0;
 
     _termination_callback();
@@ -842,7 +864,7 @@ int Encoding::solve() {
 
 void Encoding::addUnitConstraint(int lit) {
     _stats.begin(STAGE_FORBIDDENOPERATIONS);
-    _sat.addClause(lit);
+    __interfaceSolver__addClause(lit);
     _stats.end(STAGE_FORBIDDENOPERATIONS);
 }
 
@@ -867,4 +889,145 @@ void Encoding::printSatisfyingAssignment() {
         Log::d("%i ", _sat.holds(v) ? v : -v);
     }
     Log::d("\n");
+}
+
+
+
+
+
+
+
+
+
+/****************************************************/
+/*************INTERFACE WITH THE SOLVER*************/
+
+int Encoding::__interfaceSolver__encodeVariable(VarType type, Position& pos, const USignature& sig) {
+    int var = _vars.encodeVariable(type, pos, sig);
+
+    if (_useSMTSolver) {
+        _smt.addVar(var, Names::to_SMT_string(sig), pos.getLayerIndex(), pos.getPositionIndex());
+    }
+
+    return var;
+}
+
+int Encoding::__interfaceSolver__encodeVarPrimitive(int layer, int pos) {
+    int var = _vars.encodeVarPrimitive(layer, pos);
+
+    if (_useSMTSolver) {
+        _smt.addVar(var, "__PRIMITIVE___", layer, pos);
+    }
+
+    return var;
+}
+
+int Encoding::__interfaceSolver__encodeQConstantEqualityVar(int qconst1, int qconst2) {
+    int var = _vars.encodeQConstantEqualityVar(qconst1, qconst2);
+
+    if (_useSMTSolver) {
+        std::string var_name = "__QCONST_EQUALITY___" + std::to_string(qconst1) + "_" + std::to_string(qconst2);
+        _smt.addVar(var, var_name, -1, -1);
+    }
+
+    return var;
+}
+
+
+int Encoding::__interfaceSolver__varSubstitution(int qConstId, int trueConstId) {
+    int var = _vars.varSubstitution(qConstId, trueConstId);
+
+    if (_useSMTSolver) {
+        const USignature& sigSubst = _vars.sigSubstitute(qConstId, trueConstId);
+        _smt.addVar(var, Names::to_SMT_string(sigSubst), -1, -1, true, qConstId, trueConstId);
+        // _smt.addSubstituteVar(sigSubst, qConstId, trueConstId, var);
+    }
+
+    return var;
+}
+
+
+
+void Encoding::__interfaceSolver__addClause(int lit) {
+
+    if (_useSMTSolver) {
+        _smt.addClause(lit);
+    } else {
+        _sat.addClause(lit);
+    }
+}
+
+void Encoding::__interfaceSolver__addClause(int lit1, int lit2) {
+
+    if (_useSMTSolver) {
+        _smt.addClause(lit1, lit2);
+    } else {
+        _sat.addClause(lit1, lit2);
+    }
+}
+
+
+void Encoding::__interfaceSolver__addClause(int lit1, int lit2, int lit3) {
+
+    if (_useSMTSolver) {
+        _smt.addClause(lit1, lit2, lit3);
+    } else {
+        _sat.addClause(lit1, lit2, lit3);
+    }
+}
+
+void Encoding::__interfaceSolver__addClause(const std::vector<int>& cls) {
+
+    if (_useSMTSolver) {
+        _smt.addClause(cls);
+    } else {
+        _sat.addClause(cls);
+    }
+}
+
+
+void Encoding::__interfaceSolver__appendClause(int lit) {
+
+    if (_useSMTSolver) {
+        _smt.appendClause(lit);
+    } else {
+        _sat.appendClause(lit);
+    }
+}
+
+void Encoding::__interfaceSolver__appendClause(int lit1, int lit2) {
+    
+    if (_useSMTSolver) {
+        _smt.appendClause(lit1, lit2);
+    } else {
+        _sat.appendClause(lit1, lit2);
+    }
+}
+
+void Encoding::__interfaceSolver__endClause() {
+
+    if (_useSMTSolver) {
+        _smt.endClause();
+    } else {
+        _sat.endClause();
+    }
+}
+
+
+void Encoding::__interfaceSolver__assume(int lit) {
+
+    if (_useSMTSolver) {
+        _smt.assume(lit);
+    } else {
+        _sat.assume(lit);
+    }
+}
+
+int Encoding::__interfaceSolver__solve() {
+
+    if (_useSMTSolver) {
+        return _smt.solve();
+    } else {
+        return _sat.solve();
+    }
 }

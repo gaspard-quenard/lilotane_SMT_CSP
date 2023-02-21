@@ -19,6 +19,19 @@ namespace Names {
         return nbt->at(nameId);
     }
 
+    std::string to_string_without_invalid_SMT_symbols(int nameId) {
+        std::string nameStr = Names::to_string(nameId);
+        for (char& c : nameStr) {
+                // The variable names in SMT-LIB are not allowed to contain
+                // the characters ',', ':',. We replace them with
+                // '_', '%', respectively.
+                if (c == ',') c = '-';
+                if (c == ':') c = '%';
+                if (c == '*') c = '_';
+        }
+        return nameStr;
+    }
+
     std::string to_string(const std::vector<int>& nameIds) {
         std::string out = "(";
         bool first = true;
@@ -63,6 +76,26 @@ namespace Names {
         out += ")";
         return out;
     }
+
+    std::string to_SMT_string(const USignature& sig) {
+        std::string out = "";
+        out += to_string(sig._name_id);
+        for (int arg : sig._args) {
+            std::string arg_str = to_string(arg);
+            // std::cout << arg_str << std::endl;
+            for (char& c : arg_str) {
+                // The variable names in SMT-LIB are not allowed to contain
+                // the characters ',', ':',. We replace them with
+                // '_', '%', respectively.
+                if (c == ',') c = '-';
+                if (c == ':') c = '%';
+                if (c == '*') c = '_';
+            }
+            out += "-" + arg_str;
+        }
+        return out;
+    }
+
 
     std::string to_string(const PositionedUSig& sig) {
         std::string out = to_string(sig.usig) + "@(" + std::to_string(sig.layer) + "," + std::to_string(sig.pos) + ")";
