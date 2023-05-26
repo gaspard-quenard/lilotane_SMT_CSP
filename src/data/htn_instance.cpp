@@ -17,6 +17,7 @@ HtnInstance::HtnInstance(Parameters& params) :
 
     // Transfer random seed to the hash function for any kind of signature
     USignatureHasher::seed = _params.getIntParam("s");
+    USignatureHasherWithUniqueID::seed = _params.getIntParam("s");
 
     Log::i("Parser finished.\n");
 
@@ -342,7 +343,7 @@ const Reduction& HtnInstance::getInitReduction() {
     return _init_reduction;
 }
 
-const USignature& HtnInstance::getBlankActionSig() {
+USignature& HtnInstance::getBlankActionSig() {
     return _blank_action_sig;
 }
 
@@ -633,6 +634,7 @@ USignature HtnInstance::getRepetitionOfAction(const USignature& action) {
 
     int repOpNameId = getRepetitionNameOfAction(action._name_id);
     USignature sig(repOpNameId, action._args);
+    // sig.setRepetition(action.repetition);
 
     if (!_op_table.hasAction(sig)) {
 
@@ -688,6 +690,12 @@ std::vector<int> HtnInstance::replaceVariablesWithQConstants(const HtnOp& op,
     
     if (op.getArguments().empty()) return std::vector<int>();
     std::vector<int> vecFailure(1, -1);
+
+
+    // USignature newSig_test(op.getSignature()._name_id, op.getArguments());
+    // if (layerIdx == 3 and pos == 12) {
+    //     int dbg = 0;
+    // }
 
     std::vector<int> args = op.getArguments();
     std::vector<int> varargIndices;
@@ -752,12 +760,32 @@ std::vector<int> HtnInstance::replaceVariablesWithQConstants(const HtnOp& op,
 
     // Remember exact domain of each q constant for this operation
     USignature newSig(op.getSignature()._name_id, args);
+    Log::i("Update Domain of: %s\n", Names::to_SMT_string(newSig).c_str());
+    if (Names::to_SMT_string(newSig, true) == "ACTION____SURROGATE*m_drive_to_ordering_0*drive*-Q_3-12_location%0_1aed25e8913b0329-Q_2-8_location%0_e4354a9774db1231-truck_0") {
+        int dbg = 0;
+    }
     for (auto& [qconst, domain] : domainsPerQConst) {
         _q_const_to_op_domains[qconst][newSig] = std::move(domain);
     }
 
     return args;
 }
+
+// TEST LIFTED TREE PATH
+void HtnInstance::inheritQConstFromParent(USignature child, USignature parent) {
+    // Inherit q-constants from parent
+    for (int arg: child._args) {
+        if (!_q_const_to_op_domains.count(arg)) continue;
+        // If the child already has a domain for this q-constant, skip it
+        if (_q_const_to_op_domains[arg].count(child)) continue;
+
+        // Else, inherit only if the parent has a domain for this q-constant
+        if (!_q_const_to_op_domains[arg].count(parent)) continue;
+
+        _q_const_to_op_domains[arg][child] = _q_const_to_op_domains[arg][parent];
+    }
+}
+// END TES LIFTED TREE PATH
 
 void HtnInstance::initQConstantSorts(int id, const FlatHashSet<int>& domain) {
 
@@ -877,13 +905,35 @@ std::vector<int> HtnInstance::popOperationDependentDomainOfQConstant(int qconst,
     assert(it1 != _q_const_to_op_domains.end());
     auto& opDomains = it1->second;
     auto it2 = opDomains.find(op);
+    if (it2 == opDomains.end()) {
+        // Print error message
+        Log::e("No domain for %s in %s(%i)\n", TOSTR(qconst), Names::to_SMT_string(op, true).c_str(), op._unique_id);
+        Log::e("Only domains for: \n");
+        for (auto& [uSig, domain] : opDomains) {
+            Log::e("    %s\n", Names::to_SMT_string(uSig, true).c_str());
+        }
+        // Check the size of the opDomains, if there is only one OP, it is ok
+        if (opDomains.size() == 1) {
+            // Let's get this one (very ugly way, but, no other idea right now)
+            std::vector<int> domain = opDomains.begin()->second;
+            // if (opDomains.size() == 1) {
+            //     _q_const_to_op_domains.erase(it1);
+            // } else {
+            //     opDomains.erase(it2);
+            // }
+            return domain;
+
+        } else {
+            int a = 0;
+        }
+    }
     assert(it2 != opDomains.end());
     std::vector<int> domain = it2->second;
-    if (opDomains.size() == 1) {
-        _q_const_to_op_domains.erase(it1);
-    } else {
-        opDomains.erase(it2);
-    }
+    // if (opDomains.size() == 1) {
+    //     _q_const_to_op_domains.erase(it1);
+    // } else {
+    //     opDomains.erase(it2);
+    // }
     return domain;
 }
 

@@ -77,9 +77,20 @@ namespace Names {
         return out;
     }
 
-    std::string to_SMT_string(const USignature& sig) {
+    std::string to_SMT_string(const USignature& sig, bool isAction) {
         std::string out = "";
+        if (isAction) {
+            out += "ACTION__";
+        }
         out += to_string(sig._name_id);
+        // if (sig.repetition > 0) {
+        //     out += 'R';
+        //     out += std::to_string(sig.repetition);
+        // }
+        // Add the ID ?
+        // out += 'R';
+        // out += std::to_string(sig._unique_id);
+        
         for (int arg : sig._args) {
             std::string arg_str = to_string(arg);
             // std::cout << arg_str << std::endl;

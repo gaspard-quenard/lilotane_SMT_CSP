@@ -34,6 +34,8 @@ const SigSet& FactAnalysis::getPossibleFactChanges(const USignature& sig, FactIn
             NetworkTraversal::TRAVERSE_PREORDER,
             [&](const USignature& nodeSig, int depth) { // NOLINT
                 if (_htn.isAction(nodeSig)) {
+
+                    // std::cout << " " << Names::to_string(nodeSig) << std::endl;
                     
                     Action a;
                     if (_htn.isActionRepetition(nameId)) {
@@ -68,7 +70,9 @@ const SigSet& FactAnalysis::getPossibleFactChanges(const USignature& sig, FactIn
     // Get fact changes, substitute arguments
     _fact_changes_cache[sig] = factChanges.at(nameId);
     for (Signature& s : _fact_changes_cache[sig]) {
+        // std::cout << "prev " << Names::to_string(s) << std::endl;
         s.apply(sFromPlaceholder);
+        // std::cout << "after " << Names::to_string(s) << std::endl;
     }
     return _fact_changes_cache[sig];
 }

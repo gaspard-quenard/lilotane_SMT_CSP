@@ -30,6 +30,14 @@ struct USignature {
 
     int _name_id = -1;
     std::vector<int> _args;
+    int repetition = 0;
+
+    static long long int nextID; // Static variable to store the next available ID
+
+    long long int _unique_id = -1;
+    bool is_primitive = false;
+    int max_step_from_root = -1;
+    int last_parent_method_id = -1;
 
     USignature();
     USignature(int nameId, const std::vector<int>& args);
@@ -45,8 +53,32 @@ struct USignature {
     USignature& operator=(const USignature& sig);
     USignature& operator=(USignature&& sig);
 
+
+    inline void setIsPrimitive(bool isPrimitive) {
+        is_primitive = isPrimitive;
+    }
+
+    inline void setLastParentMethodId(int lastParentMethodId) {
+        last_parent_method_id = lastParentMethodId;
+    }
+
+    inline void setRepetition(int rep) {
+        repetition = rep;
+    }
+
+    inline void setMaxStepFromRoot(int maxStepFromRoot) {
+        max_step_from_root = maxStepFromRoot;
+    }
+
+    inline void setNextId() {
+        USignature::nextID++;
+        _unique_id = USignature::nextID;
+    }
+
     inline bool operator==(const USignature& b) const {
         if (_name_id != b._name_id) return false;
+        // if (_unique_id != b._unique_id) return false;
+        if (repetition != b.repetition) return false;
         if (_args != b._args) return false;
         return true;
     }
@@ -104,9 +136,28 @@ struct USignatureHasher {
             hash_combine(hash, arg);
         }
         hash_combine(hash, s._name_id);
+        // hash_combine(hash, s.repetition);
+        // hash_combine(hash, s._unique_id);
         return hash;
     }
 };
+
+
+struct USignatureHasherWithUniqueID {
+    static int seed;
+    inline std::size_t operator()(const USignature& s) const {
+        size_t hash = seed + s._args.size();
+        for (const int& arg : s._args) {
+            hash_combine(hash, arg);
+        }
+        hash_combine(hash, s._name_id);
+        // hash_combine(hash, s.repetition);
+        hash_combine(hash, s._unique_id);
+        return hash;
+    }
+};
+
+
 struct SignatureHasher {
     USignatureHasher _usig_hasher;
     inline std::size_t operator()(const Signature& s) const {
@@ -135,9 +186,11 @@ struct SigVecHasher {
 
 typedef FlatHashSet<Signature, SignatureHasher> SigSet;
 typedef FlatHashSet<USignature, USignatureHasher> USigSet;
+typedef FlatHashSet<USignature, USignatureHasherWithUniqueID> USigSetUniqueID;
 
 namespace Sig {
     const static USignature NONE_SIG = USignature(-1, std::vector<int>());
+    const static PositionedUSig NONE_POS_SIG = PositionedUSig();
     const static SigSet EMPTY_SIG_SET;
     const static USigSet EMPTY_USIG_SET;
 }

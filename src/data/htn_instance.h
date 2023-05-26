@@ -105,7 +105,8 @@ public:
 
     USigSet getInitState();
     const Reduction& getInitReduction();
-    const USignature& getBlankActionSig();
+    // const USignature& getBlankActionSig();
+    USignature& getBlankActionSig();
     Action getGoalAction();
     void printStatistics();
     size_t getNumFreeArguments(const Reduction& r);
@@ -138,6 +139,10 @@ public:
     const IntPair& getOriginOfQConstant(int qconst) const;
     const FlatHashSet<int>& getDomainOfQConstant(int qconst) const;
     std::vector<int> popOperationDependentDomainOfQConstant(int qconst, const USignature& op);
+
+    // TEST LIFTED TREE PATH
+    void inheritQConstFromParent(USignature child, USignature parent);
+    // END TEST
 
     std::vector<int> getOpSortsForCondition(const USignature& sig, const USignature& op);
 

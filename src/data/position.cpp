@@ -83,24 +83,114 @@ const USigSet& Position::getQFactDecodings(const USignature& qFact, bool negated
     return set.at(qFact);
 }
 
-void Position::addAction(const USignature& action) {
+// void Position::addAction(const USignature& action) {
+//     _actions.insert(action);
+//     Log::d("+ACTION@(%i,%i) %s\n", _layer_idx, _pos, TOSTR(action));
+// }
+void Position::addAction(USignature& action) {
+    // action.setRepetition(10);
     _actions.insert(action);
+    // Forced to do that because of the way the hash is computed
+    _actionsWithUniqueID.insert(action);
     Log::d("+ACTION@(%i,%i) %s\n", _layer_idx, _pos, TOSTR(action));
 }
 void Position::addAction(USignature&& action) {
     Log::d("+ACTION@(%i,%i) %s\n", _layer_idx, _pos, TOSTR(action));
     _actions.insert(std::move(action));
+
+    // Forced to do that because of the way the hash is computed
+    _actionsWithUniqueID.insert(action);
 }
 void Position::addReduction(const USignature& reduction) {
     _reductions.insert(reduction);
     Log::d("+REDUCTION@(%i,%i) %s\n", _layer_idx, _pos, TOSTR(reduction));
 }
 void Position::addExpansion(const USignature& parent, const USignature& child) {
+
+    // if (child._unique_id == 366 || child._unique_id == 364) {
+    //     int dbg = 0;
+    //     USignature copy = child;
+    //     copy._unique_id = 366;
+    //     // Check if it is in the set
+    //     auto& predUniqueId = _predecessors_with_unique_id[copy];
+    //     if (predUniqueId.size() > 0) {
+    //         int dbg = 0;
+    //     }
+    // }
+
     auto& set = _expansions[parent];
     set.insert(child);
     auto& pred = _predecessors[child];
     pred.insert(parent);
+
+    auto& predUniqueId = _predecessors_with_unique_id[child._unique_id];
+    if (predUniqueId.size() > 0) {
+        Log::i("Size superior for %s (%i)\n", Names::to_SMT_string(child).c_str(), child._unique_id);
+        Log::i("All predecessors:\n");
+        for (const auto& p : predUniqueId) {
+            Log::i("    %s (%i)\n", Names::to_SMT_string(p).c_str(), p._unique_id);
+            // Write all of its children
+            auto& children = _expansions[p];
+            Log::i("        Children:\n");
+            for (const auto& c : children) {
+                Log::i("            %s (%i)\n", Names::to_SMT_string(c).c_str(), c._unique_id);
+            }
+        }
+        Log::i("    %s (%i)\n", Names::to_SMT_string(parent).c_str(), parent._unique_id);
+        Log::i("        Children:\n");
+        for (const auto& c : set) {
+            Log::i("            %s (%i)\n", Names::to_SMT_string(c).c_str(), c._unique_id);
+        }
+        int dbg = 0;
+    }
+    predUniqueId.insert(parent);
+
+    // if (child._unique_id == 364) {
+    //     // Make a test, do a copy and change the unique_id
+    //     USignature copy = child;
+    //     copy._unique_id = 366;
+    //     // Check if it is in the set
+    //     auto& predUniqueId = _predecessors_with_unique_id[copy];
+    //     if (predUniqueId.size() > 0) {
+    //         int dbg = 0;
+    //     }
+    // }
 }
+
+
+
+// TEST  ================================================
+void Position::addPrevious(const USignature& current, const USignature& previous) {
+    if (previous._unique_id == 130) {
+        int dbg = 0;
+    }
+    auto& set = _previous[current];
+    set.insert(previous);
+}
+
+void Position::addNexts(const USignature& current, const USignature& next) {
+    auto& set = _nexts[current];
+    set.insert(next);
+}
+
+void Position::addLastParentMethodId(const USignature& current, int lastParentMethodId) {
+    _last_parent_method_id[current] = lastParentMethodId;
+}
+
+void Position::addActionInPrimitiveTree(const USignature& action) {
+    _actions_in_primitive_tree.insert(action);
+}
+
+void Position::removeActionInPrimitiveTree(const USignature& action) {
+    // Remove action in primitive tree if exist
+    if (_actions_in_primitive_tree.count(action)) {
+        _actions_in_primitive_tree.erase(action);
+    }
+}
+// END TEST ================================================
+
+
+
 void Position::addExpansionSubstitution(const USignature& parent, const USignature& child, Substitution&& s) {
     _expansion_substitutions[parent][child] = std::move(s);
 }
@@ -114,6 +204,7 @@ void Position::addExpansionSize(size_t size) {_max_expansion_size = std::max(_ma
 
 void Position::removeActionOccurrence(const USignature& action) {
     _actions.erase(action);
+    _actionsWithUniqueID.erase(action);
     for (auto& [parent, children] : _expansions) {
         children.erase(action);
     }
@@ -185,12 +276,22 @@ const NodeHashMap<USignature, std::vector<TypeConstraint>, USignatureHasher>& Po
 }
 
 USigSet& Position::getActions() {return _actions;}
-const USigSet& Position::getReductions() const {return _reductions;}
-NodeHashMap<USignature, USigSet, USignatureHasher>& Position::getExpansions() {return _expansions;}
+USigSetUniqueID& Position::getActionsWithUniqueID() {return _actionsWithUniqueID;}
+USigSet& Position::getReductions() {return _reductions;}
+NodeHashMap<USignature, USigSet, USignatureHasherWithUniqueID>& Position::getExpansions() {return _expansions;}
 NodeHashMap<USignature, USigSet, USignatureHasher>& Position::getPredecessors() {return _predecessors;}
+// NodeHashMap<USignature, USigSetUniqueID, USignatureHasherWithUniqueID>& Position::getPredecessorsWithUniqueID() {return _predecessors_with_unique_id;}
+NodeHashMap<int, USigSetUniqueID>& Position::getPredecessorsWithUniqueID() {return _predecessors_with_unique_id;}
 const NodeHashMap<USignature, USigSubstitutionMap, USignatureHasher>& Position::getExpansionSubstitutions() const {return _expansion_substitutions;}
 const USigSet& Position::getAxiomaticOps() const {return _axiomatic_ops;}
 size_t Position::getMaxExpansionSize() const {return _max_expansion_size;}
+
+// TEST
+NodeHashMap<USignature, USigSet, USignatureHasher>& Position::getPrevious() {return _previous;}
+NodeHashMap<USignature, USigSet, USignatureHasher>& Position::getNexts() {return _nexts;}
+NodeHashMap<USignature, int, USignatureHasher>& Position::getLastParentMethodId() {return _last_parent_method_id;}
+NodeHashSet<USignature, USignatureHasher>& Position::getActionsInPrimitiveTree() {return _actions_in_primitive_tree;}
+// END TEST
 
 void Position::clearAfterInstantiation() {
 }

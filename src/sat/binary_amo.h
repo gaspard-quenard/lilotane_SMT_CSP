@@ -16,6 +16,7 @@ private:
 public:
     BinaryAtMostOne(const std::vector<int>& states, size_t numStates);
     std::vector<std::vector<int>> encode();
+    std::vector<int> getBinNumVar() { return _bin_num_vars; }
 
 private:
     std::vector<int> getClause(int state, bool sign) const;

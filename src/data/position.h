@@ -32,9 +32,24 @@ private:
     USigSet _actions;
     USigSet _reductions;
 
-    NodeHashMap<USignature, USigSet, USignatureHasher> _expansions;
-    NodeHashMap<USignature, USigSet, USignatureHasher> _predecessors;
+    USigSetUniqueID _actionsWithUniqueID;
+
+    NodeHashMap<USignature, USigSet, USignatureHasherWithUniqueID> _expansions;
+    NodeHashMap<USignature, USigSet, USignatureHasher> _predecessors; // FOR STRANGE REASON, I CANNOT PUT USignatureHasherWithUniqueID AS HASH HERE ???
+    // NodeHashMap<USignature, USigSetUniqueID, USignatureHasherWithUniqueID> _predecessors_with_unique_id; 
+    NodeHashMap<int, USigSetUniqueID> _predecessors_with_unique_id; 
     NodeHashMap<USignature, USigSubstitutionMap, USignatureHasher> _expansion_substitutions;
+
+    // TEST ===========================================================
+
+    NodeHashMap<USignature, USigSet, USignatureHasher> _previous;
+    NodeHashMap<USignature, USigSet, USignatureHasher> _nexts;
+    // Indicate for each Usignature its last parent method (only one parent method is allowed)
+    NodeHashMap<USignature, int, USignatureHasher> _last_parent_method_id;
+
+    NodeHashSet<USignature, USignatureHasher> _actions_in_primitive_tree;
+
+    // END TEST ========================================================
 
     USigSet _axiomatic_ops;
 
@@ -62,6 +77,10 @@ private:
     // Prop. variable for each occurring signature.
     NodeHashMap<USignature, int, USignatureHasher> _op_variables;
     NodeHashMap<USignature, int, USignatureHasher> _fact_variables;
+
+    NodeHashMap<int, int> _op_variables_unique_id;
+
+
 
     bool _has_primitive_ops = false;
     bool _has_nonprimitive_ops = false;
@@ -93,7 +112,8 @@ public:
     void removeQFactDecoding(const USignature& qFact, const USignature& decFact, bool negated);
     const USigSet& getQFactDecodings(const USignature& qfact, bool negated);
 
-    void addAction(const USignature& action);
+    // void addAction(const USignature& action);
+    void addAction(USignature& action);
     void addAction(USignature&& action);
     void addReduction(const USignature& reduction);
     void addExpansion(const USignature& parent, const USignature& child);
@@ -101,6 +121,14 @@ public:
     void addExpansionSubstitution(const USignature& parent, const USignature& child, Substitution&& s);
     void addAxiomaticOp(const USignature& op);
     void addExpansionSize(size_t size);
+
+    // TEST ===========================================================
+    void addPrevious(const USignature& current, const USignature& previous);
+    void addNexts(const USignature& current, const USignature& next);
+    void addLastParentMethodId(const USignature& current, int lastParentMethodId);
+    void addActionInPrimitiveTree(const USignature& action);
+    void removeActionInPrimitiveTree(const USignature& action);
+    // END TEST ========================================================
     
     void removeActionOccurrence(const USignature& action);
     void removeReductionOccurrence(const USignature& reduction);
@@ -128,12 +156,22 @@ public:
     }
 
     USigSet& getActions();
-    const USigSet& getReductions() const;
-    NodeHashMap<USignature, USigSet, USignatureHasher>& getExpansions();
+    USigSetUniqueID& getActionsWithUniqueID();
+    USigSet& getReductions();
+    NodeHashMap<USignature, USigSet, USignatureHasherWithUniqueID>& getExpansions();
     NodeHashMap<USignature, USigSet, USignatureHasher>& getPredecessors();
+    // NodeHashMap<USignature, USigSetUniqueID, USignatureHasherWithUniqueID>& getPredecessorsWithUniqueID();
+    NodeHashMap<int, USigSetUniqueID>& getPredecessorsWithUniqueID();
     const NodeHashMap<USignature, USigSubstitutionMap, USignatureHasher>& getExpansionSubstitutions() const;
     const USigSet& getAxiomaticOps() const;
     size_t getMaxExpansionSize() const;
+
+    // TEST 
+    NodeHashMap<USignature, USigSet, USignatureHasher>& getPrevious();
+    NodeHashMap<USignature, USigSet, USignatureHasher>& getNexts();
+    NodeHashMap<USignature, int, USignatureHasher>& getLastParentMethodId();
+    NodeHashSet<USignature, USignatureHasher>& getActionsInPrimitiveTree();
+    // END TEST
 
     size_t getLayerIndex() const;
     size_t getPositionIndex() const;

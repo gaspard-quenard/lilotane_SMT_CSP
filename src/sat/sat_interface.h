@@ -27,8 +27,12 @@ private:
     std::ofstream _out;
     EncodingStatistics& _stats;
 
-    const bool _print_formula = true;    
+    const bool _print_formula;    
     bool _began_line = false;
+
+    const bool _is_used;
+
+    const int _seed; 
 
     const int _debug_level = 0;
 
@@ -37,7 +41,7 @@ private:
 
 public:
     SatInterface(bool is_used, Parameters& params, EncodingStatistics& stats) : 
-                _params(params), _stats(stats), _print_formula(params.isNonzero("wf")) {
+                _is_used(is_used), _params(params), _stats(stats), _print_formula(params.isNonzero("wf")), _seed(params.getIntParam("s")) {
 
         _solver = ipasir_init();
 
@@ -156,6 +160,13 @@ public:
         _stats._num_asmpts++;
     }
 
+    inline void reset_solver() {
+        ipasir_release(_solver);
+
+        _solver = ipasir_init();
+        ipasir_set_seed(_solver, _seed);
+    }
+
     inline bool holds(int lit) {
         return ipasir_val(_solver, lit) > 0;
     }
@@ -190,6 +201,10 @@ public:
     }
 
     ~SatInterface() {
+
+        if (!_is_used) {
+            return;
+        }
 
         if (_params.isNonzero("wf")) {
 

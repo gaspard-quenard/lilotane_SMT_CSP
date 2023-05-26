@@ -13,6 +13,8 @@
 #include "algo/fact_analysis.h"
 #include "sat/variable_provider.h"
 #include "sat/decoder.h"
+#include "data/primitive_tree.h"
+#include "data/primitive_tree_pos.h"
 
 typedef NodeHashMap<int, SigSet> State;
 
@@ -75,11 +77,23 @@ public:
     void printFailedVars(Layer& layer);
     void printSatisfyingAssignment();
 
+
+    // For lifted tree path
+    // void encode_for_lifted_tree_path(size_t layerIdx, size_t pos);
+    void encode_for_lifted_tree_path(size_t layerIdx, size_t pos);
+    void encode_for_lifted_tree_path_ensure_one_init_action_is_true(size_t layerIdx);
+    void __interfaceSolver__reset();
+    // ENd for lifted tree path
+
     Plan extractPlan() {
         return _decoder.extractPlan();
     }
     void printStatistics() {
-        _stats.printStages();
+        if (_useSMTSolver) {
+            _smt_stats.printStages();
+        } else {
+            _stats.printStages();
+        }
     }
     SatInterface& getSatInterface() {return _sat;}
     EncodingStatistics& getEncodingStatistics() {return _stats;}
@@ -91,18 +105,39 @@ public:
         }
     }
 
+
+
+    void __interfaceSolver__printFormula();
+
 private:
     void encodeOperationVariables(Position& pos);
     void encodeFactVariables(Position& pos, Position& left, Position& above);
     void encodeFrameAxioms(Position& pos, Position& left);
     void encodeIndirectFrameAxioms(const std::vector<int>& headerLits, int opVar, const IntPairTree& tree);
     void encodeOperationConstraints(Position& pos);
-    void encodeSubstitutionVars(const USignature& opSig, int opVar, int qconst);
+    void encodeSubstitutionVars(const USignature& opSig, int opVar, int qconst, Position& pos);
     void encodeQFactSemantics(Position& pos);
     void encodeActionEffects(Position& pos, Position& left);
     void encodeQConstraints(Position& pos);
     void encodeSubtaskRelationships(Position& pos, Position& above);
     int encodeQConstEquality(int q1, int q2);
+
+
+    // For lifted tree path
+
+    // End for lifted tree path
+    void encodePrimActionTrueImpliesOneNextPrimActionIsTrue(Position& left, Position& pos);
+
+    void encodeOperationVariables_LiftedTreePath(Position& pos);
+    void encodeFactVariables_LiftedTreePath(Position& pos, Position& left, Position& above);
+    void encodeFrameAxioms_LiftedTreePath(Position& pos, Position& left);
+    void encodeOperationConstraints_LiftedTreePath(Position& pos);
+    void encodeQFactSemantics_LiftedTreePath(Position& pos);
+    void encodeActionEffects_LiftedTreePath(Position& pos, Position& left);
+    void encodeQConstraints_LiftedTreePath(Position& pos);
+    
+    
+
 
 
 

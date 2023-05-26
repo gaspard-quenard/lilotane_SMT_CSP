@@ -4,8 +4,10 @@
 USignature::USignature() = default;
 USignature::USignature(int nameId, const std::vector<int>& args) : _name_id(nameId), _args(args) {}
 USignature::USignature(int nameId, std::vector<int>&& args) : _name_id(nameId), _args(std::move(args)) {}
-USignature::USignature(const USignature& sig) : _name_id(sig._name_id), _args(sig._args) {}
-USignature::USignature(USignature&& sig) : _name_id(sig._name_id), _args(std::move(sig._args)) {}
+USignature::USignature(const USignature& sig) : _name_id(sig._name_id), _args(sig._args), _unique_id(sig._unique_id) {}
+USignature::USignature(USignature&& sig) : _name_id(sig._name_id), _args(std::move(sig._args)), _unique_id(sig._unique_id) {}
+
+long long int USignature::nextID = 0;  // Definition of the static variable
 
 Signature USignature::toSignature(bool negated) const {
     return Signature(*this, negated);
@@ -33,11 +35,17 @@ USignature USignature::renamed(int nameId) const {
 
 USignature& USignature::operator=(const USignature& sig) {
     _name_id = sig._name_id;
+    // repetition = sig.repetition;
+
+    _unique_id = sig._unique_id;
     _args = sig._args;
     return *this;
 }
 USignature& USignature::operator=(USignature&& sig) {
     _name_id = sig._name_id;
+    // repetition = sig.repetition;
+
+    _unique_id = sig._unique_id;
     _args = std::move(sig._args);
     return *this;
 }
@@ -87,3 +95,4 @@ Signature& Signature::operator=(Signature&& sig) {
 }
 
 int USignatureHasher::seed = 1;
+int USignatureHasherWithUniqueID::seed = 1;

@@ -17,6 +17,7 @@
 #include "algo/plan_writer.h"
 #include "sat/encoding.h"
 #include <optional>
+#include "data/primitive_tree.h"
 
 typedef std::pair<std::vector<PlanItem>, std::vector<PlanItem>> Plan;
 
@@ -49,6 +50,8 @@ private:
     float _optimization_factor;
     float _time_at_first_plan = 0;
 
+    bool USE_LIFTED_TREE_PATH;
+
     bool _has_plan;
     Plan _plan;
 
@@ -66,6 +69,7 @@ public:
             _pruning(_layers, _enc),
             _domination_resolver(_htn),
             _plan_writer(_htn, _params),
+            USE_LIFTED_TREE_PATH(_params.isNonzero("useLiftedTreePathEncoder")),
             _init_plan_time_limit(_params.getFloatParam("T")), _nonprimitive_support(_params.isNonzero("nps")), 
             _optimization_factor(_params.getFloatParam("of")), _has_plan(false) {
 
@@ -82,7 +86,7 @@ public:
 private:
 
     void createFirstLayer();
-    void createNextLayer();
+    bool createNextLayer();
     
     void createNextPosition();
     void createNextPositionFromAbove();
@@ -101,6 +105,7 @@ private:
 
     void propagateInitialState();
     void propagateActions(size_t offset);
+    void propagateActionsWithUniqueID(size_t offset);
     void propagateReductions(size_t offset);
     std::vector<USignature> instantiateAllActionsOfTask(const USignature& task);
     std::vector<USignature> instantiateAllReductionsOfTask(const USignature& task);
@@ -111,6 +116,11 @@ private:
     int getTerminateSatCall();
     void clearDonePositions(int offset);
     void printStatistics();
+
+
+    bool constructPrimitiveTree(Layer& layer, int layerIdx);
+    void computePreviousesAndNextsFlows(Layer& layer, int layerIdx);
+    bool recursiveComputePrimitiveTree(USignature currentAction, Layer& layer, int posIdx, robin_hood::unordered_set<USignature, USignatureHasher>& actionsAlreadyVisited, robin_hood::unordered_set<int>& idActionsInPrimitiveTree);
 
 };
 

@@ -16,7 +16,8 @@ void NetworkTraversal::traverse(const USignature& opSig, TraverseOrder order, st
     while (!frontier.empty()) {
         USignature nodeSig = frontier.back(); frontier.pop_back();
         int depth = depths.back(); depths.pop_back();
-        //log("%s\n", TOSTR(nodeSig));
+        // log("%s\n", TOSTR(nodeSig));
+        // std::cout << "--> " << TOSTR(nodeSig) << std::endl;
 
         if (depth < 0) {
             // Post-order traversal: visit and pop

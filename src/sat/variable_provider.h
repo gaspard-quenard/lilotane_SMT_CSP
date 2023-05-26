@@ -92,6 +92,10 @@ public:
         return _q_equality_variables[IntPair(qconst1, qconst2)];
     }
 
+    void clearQConstantEqualityVars() {
+        _q_equality_variables.clear();
+    }
+
     void skipVariable() {
         VariableDomain::nextVar();
     }

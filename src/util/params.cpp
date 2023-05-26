@@ -71,8 +71,14 @@ void Parameters::setDefaults() {
     setParam("v", "2"); // verbosity
     setParam("aar", "1"); // acknowledge action repetitions
     setParam("vp", "0"); // verify plan before printing it
-    setParam("wf", "0"); // output formula to f.cnf
+    setParam("wf", "0"); // output formula (to f.cnf for SAT) and to (Test2.smt for SMT)
     setParam("smt", "0"); // use SMT encoding
+    setParam("smtSolver", "z3"); // SMT solver to use (z3, cvc5)
+    setParam("one_var_qconst", "0"); // for the SMT encoding use one integer variable to represent all the domain of a substiute qconst
+    setParam("use_enum_sort", "0"); // for the SMT encoding when using the one_var_qconst option, use an enum sort instead of an integer sort to represent the domain of a substitute qconst
+    setParam("SMT_logic", "0"); // Logic to use. If not specified. will try to infer it from the domain and other parameters
+
+    setParam("useLiftedTreePathEncoder", "0"); // Use lifted tree path instead of lilotane's encoding
 }
 
 void Parameters::printUsage() {
