@@ -760,10 +760,10 @@ std::vector<int> HtnInstance::replaceVariablesWithQConstants(const HtnOp& op,
 
     // Remember exact domain of each q constant for this operation
     USignature newSig(op.getSignature()._name_id, args);
-    Log::i("Update Domain of: %s\n", Names::to_SMT_string(newSig).c_str());
-    if (Names::to_SMT_string(newSig, true) == "ACTION____SURROGATE*m_drive_to_ordering_0*drive*-Q_3-12_location%0_1aed25e8913b0329-Q_2-8_location%0_e4354a9774db1231-truck_0") {
-        int dbg = 0;
-    }
+    Log::d("Update Domain of: %s\n", Names::to_SMT_string(newSig).c_str());
+    // if (Names::to_SMT_string(newSig, true) == "ACTION____SURROGATE*m_drive_to_ordering_0*drive*-Q_3-12_location%0_1aed25e8913b0329-Q_2-8_location%0_e4354a9774db1231-truck_0") {
+    //     int dbg = 0;
+    // }
     for (auto& [qconst, domain] : domainsPerQConst) {
         _q_const_to_op_domains[qconst][newSig] = std::move(domain);
     }

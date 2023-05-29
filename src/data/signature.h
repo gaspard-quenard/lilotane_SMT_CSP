@@ -184,9 +184,18 @@ struct SigVecHasher {
     }
 };
 
+struct USignatureEqualityWithUniqueID {
+    bool operator()(const USignature& lhs, const USignature& rhs) const {
+        return (lhs._args == rhs._args) &&
+               (lhs._name_id == rhs._name_id) &&
+               (lhs._unique_id == rhs._unique_id);
+    }
+};
+
+
 typedef FlatHashSet<Signature, SignatureHasher> SigSet;
 typedef FlatHashSet<USignature, USignatureHasher> USigSet;
-typedef FlatHashSet<USignature, USignatureHasherWithUniqueID> USigSetUniqueID;
+typedef FlatHashSet<USignature, USignatureHasherWithUniqueID, USignatureEqualityWithUniqueID> USigSetUniqueID;
 
 namespace Sig {
     const static USignature NONE_SIG = USignature(-1, std::vector<int>());

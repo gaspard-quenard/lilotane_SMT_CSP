@@ -29,25 +29,30 @@ private:
     size_t _layer_idx;
     size_t _pos;
 
+    size_t _above_pos = -1;
+
     USigSet _actions;
     USigSet _reductions;
 
     USigSetUniqueID _actionsWithUniqueID;
 
-    NodeHashMap<USignature, USigSet, USignatureHasherWithUniqueID> _expansions;
+    NodeHashMap<USignature, USigSetUniqueID, USignatureHasherWithUniqueID, USignatureEqualityWithUniqueID> _expansions;
     NodeHashMap<USignature, USigSet, USignatureHasher> _predecessors; // FOR STRANGE REASON, I CANNOT PUT USignatureHasherWithUniqueID AS HASH HERE ???
-    // NodeHashMap<USignature, USigSetUniqueID, USignatureHasherWithUniqueID> _predecessors_with_unique_id; 
+
+
     NodeHashMap<int, USigSetUniqueID> _predecessors_with_unique_id; 
     NodeHashMap<USignature, USigSubstitutionMap, USignatureHasher> _expansion_substitutions;
 
     // TEST ===========================================================
 
-    NodeHashMap<USignature, USigSet, USignatureHasher> _previous;
-    NodeHashMap<USignature, USigSet, USignatureHasher> _nexts;
+    NodeHashMap<int, USigSetUniqueID> _previous;
+    NodeHashMap<int, USigSetUniqueID> _nexts;
     // Indicate for each Usignature its last parent method (only one parent method is allowed)
-    NodeHashMap<USignature, int, USignatureHasher> _last_parent_method_id;
+    // NodeHashMap<USignature, int, USignatureHasher> _last_parent_method_id;
 
-    NodeHashSet<USignature, USignatureHasher> _actions_in_primitive_tree;
+    NodeHashSet<USignature, USignatureHasherWithUniqueID, USignatureEqualityWithUniqueID> _actions_in_primitive_tree;
+
+    USignature actionOrReductionTrue;
 
     // END TEST ========================================================
 
@@ -78,7 +83,8 @@ private:
     NodeHashMap<USignature, int, USignatureHasher> _op_variables;
     NodeHashMap<USignature, int, USignatureHasher> _fact_variables;
 
-    NodeHashMap<int, int> _op_variables_unique_id;
+    NodeHashMap<USignature, int, USignatureHasherWithUniqueID, USignatureEqualityWithUniqueID> _op_variables_unique_id;
+    // NodeHashMap<int, int> _op_variables_unique_id;
 
 
 
@@ -89,6 +95,7 @@ public:
 
     Position();
     void setPos(size_t layerIdx, size_t pos);
+    void setAbovePos(size_t abovePos);
 
     void addQFact(const USignature& qfact);
     void addTrueFact(const USignature& fact);
@@ -125,7 +132,7 @@ public:
     // TEST ===========================================================
     void addPrevious(const USignature& current, const USignature& previous);
     void addNexts(const USignature& current, const USignature& next);
-    void addLastParentMethodId(const USignature& current, int lastParentMethodId);
+    // void addLastParentMethodId(const USignature& current, int lastParentMethodId);
     void addActionInPrimitiveTree(const USignature& action);
     void removeActionInPrimitiveTree(const USignature& action);
     // END TEST ========================================================
@@ -135,6 +142,7 @@ public:
     void replaceOperation(const USignature& from, const USignature& to, Substitution&& s);
 
     const NodeHashMap<USignature, int, USignatureHasher>& getVariableTable(VarType type) const;
+    const NodeHashMap<USignature, int, USignatureHasherWithUniqueID, USignatureEqualityWithUniqueID>& getVariableTableOPUniqueID() const;
     void setVariableTable(VarType type, const NodeHashMap<USignature, int, USignatureHasher>& table);
     void moveVariableTable(VarType type, Position& destination);
 
@@ -158,7 +166,7 @@ public:
     USigSet& getActions();
     USigSetUniqueID& getActionsWithUniqueID();
     USigSet& getReductions();
-    NodeHashMap<USignature, USigSet, USignatureHasherWithUniqueID>& getExpansions();
+    NodeHashMap<USignature, USigSetUniqueID, USignatureHasherWithUniqueID, USignatureEqualityWithUniqueID>& getExpansions();
     NodeHashMap<USignature, USigSet, USignatureHasher>& getPredecessors();
     // NodeHashMap<USignature, USigSetUniqueID, USignatureHasherWithUniqueID>& getPredecessorsWithUniqueID();
     NodeHashMap<int, USigSetUniqueID>& getPredecessorsWithUniqueID();
@@ -167,14 +175,19 @@ public:
     size_t getMaxExpansionSize() const;
 
     // TEST 
-    NodeHashMap<USignature, USigSet, USignatureHasher>& getPrevious();
-    NodeHashMap<USignature, USigSet, USignatureHasher>& getNexts();
+    NodeHashMap<int, USigSetUniqueID>& getPrevious();
+    NodeHashMap<int, USigSetUniqueID>& getNexts();
     NodeHashMap<USignature, int, USignatureHasher>& getLastParentMethodId();
-    NodeHashSet<USignature, USignatureHasher>& getActionsInPrimitiveTree();
+    NodeHashSet<USignature, USignatureHasherWithUniqueID, USignatureEqualityWithUniqueID>& getActionsInPrimitiveTree();
+
+
+    void setActionOrReductionTrue(USignature& actionOrReduction);
+    USignature& getActionOrReductionTrue();
     // END TEST
 
     size_t getLayerIndex() const;
     size_t getPositionIndex() const;
+    size_t getAbovePositionIndex() const;
     
     void clearAfterInstantiation();
     void clearAtPastPosition();
@@ -224,6 +237,89 @@ public:
     inline void removeVariable(VarType type, const USignature& sig) {
         auto& vars = type == OP ? _op_variables : _fact_variables;
         vars.erase(sig);
+    }
+
+
+
+
+
+    // TEST
+    inline int encodeUniqueID(VarType type, const USignature& sig) {
+        if (type == OP) {
+            auto& vars = _op_variables_unique_id;
+            auto it = vars.find(sig);
+            if (it == vars.end()) {
+                // introduce a new variable
+                assert(!VariableDomain::isLocked() || Log::e("Unknown variable %s queried!\n", VariableDomain::varName(_layer_idx, _pos, sig).c_str()));
+                int var = VariableDomain::nextVar();
+                vars[sig] = var;
+                VariableDomain::printVar(var, _layer_idx, _pos, sig);
+                return var;
+            } else return it->second;
+        } else {
+            auto& vars = _fact_variables;
+            auto it = vars.find(sig);
+            if (it == vars.end()) {
+                // introduce a new variable
+                assert(!VariableDomain::isLocked() || Log::e("Unknown variable %s queried!\n", VariableDomain::varName(_layer_idx, _pos, sig).c_str()));
+                int var = VariableDomain::nextVar();
+                vars[sig] = var;
+                VariableDomain::printVar(var, _layer_idx, _pos, sig);
+                return var;
+            } else return it->second;
+        }
+    }
+
+    inline int setVariableUniqueID(VarType type, const USignature& sig, int var) {
+        if (type == OP) {
+            auto& vars = _op_variables_unique_id;
+            assert(!vars.count(sig));
+            vars[sig] = var;
+            return var;
+        } else {
+            auto& vars = _fact_variables;
+            assert(!vars.count(sig));
+            vars[sig] = var;
+            return var;
+        }
+    }
+
+    inline bool hasVariableUniqueID(VarType type, const USignature& sig) const {
+        if (type == OP) {
+            return _op_variables_unique_id.count(sig);
+        } else {
+            return _fact_variables.count(sig);
+        }
+    }
+
+    inline int getVariableUniqueID(VarType type, const USignature& sig) const {
+        if (type == OP) {
+            assert(_op_variables_unique_id.count(sig) || Log::e("Unknown variable %s queried!\n", VariableDomain::varName(_layer_idx, _pos, sig).c_str()));
+            return _op_variables_unique_id.at(sig);
+        } else {
+            assert(_fact_variables.count(sig) || Log::e("Unknown variable %s queried!\n", VariableDomain::varName(_layer_idx, _pos, sig).c_str()));
+            return _fact_variables.at(sig);
+        }
+    }
+
+    inline int getVariableOrZeroUniqueID(VarType type, const USignature& sig) const {
+        if (type == OP) {
+            const auto& it = _op_variables_unique_id.find(sig);
+            if (it == _op_variables_unique_id.end()) return 0;
+            return it->second;
+        } else {
+            const auto& it = _fact_variables.find(sig);
+            if (it == _fact_variables.end()) return 0;
+            return it->second;
+        }
+    }
+
+    inline void removeVariableUniqueID(VarType type, const USignature& sig) {
+        if (type == OP) {
+            _op_variables_unique_id.erase(sig);
+        } else {
+            _fact_variables.erase(sig);
+        }
     }
 };
 

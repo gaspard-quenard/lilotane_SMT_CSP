@@ -120,7 +120,11 @@ private:
 
     bool constructPrimitiveTree(Layer& layer, int layerIdx);
     void computePreviousesAndNextsFlows(Layer& layer, int layerIdx);
-    bool recursiveComputePrimitiveTree(USignature currentAction, Layer& layer, int posIdx, robin_hood::unordered_set<USignature, USignatureHasher>& actionsAlreadyVisited, robin_hood::unordered_set<int>& idActionsInPrimitiveTree);
+    bool recursiveComputePrimitiveTree(USignature currentAction, Layer& layer, int posIdx, robin_hood::unordered_set<int>& actionsAlreadyVisited, robin_hood::unordered_set<int>& idActionsInPrimitiveTree);
+
+    // TEST
+    void debug_write_all_paths_in_file(Layer& layer, int layerIdx);
+    // END TEST
 
 };
 

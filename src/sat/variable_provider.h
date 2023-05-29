@@ -45,6 +45,31 @@ public:
         return var;
     }
 
+
+    // TEST
+    inline bool isEncodedUniqueID(VarType type, int layer, int pos, const USignature& sig) {
+        return _layers.at(layer)->at(pos).hasVariableUniqueID(type, sig);
+    }
+
+    inline int getVariableUniqueID(VarType type, int layer, int pos, const USignature& sig) {
+        return getVariableUniqueID(type, _layers[layer]->at(pos), sig);
+    }
+
+    inline int getVariableUniqueID(VarType type, const Position& pos, const USignature& sig) {
+        return pos.getVariableUniqueID(type, sig);
+    }
+
+    inline int encodeVariableUniqueID(VarType type, Position& pos, const USignature& sig) {
+        int var = pos.getVariableOrZeroUniqueID(type, sig);
+        if (var == 0) var = pos.encodeUniqueID(type, sig);
+        return var;
+    }
+
+    int encodeVarPrimitiveUniqueID(int layer, int pos) {
+        return encodeVariableUniqueID(VarType::OP, _layers.at(layer)->at(pos), _sig_primitive);
+    }
+    // END TEST
+
     bool isEncodedSubstitution(const USignature& sig) {
         return _substitution_variables.count(sig);
     }

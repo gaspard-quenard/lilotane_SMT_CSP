@@ -87,9 +87,12 @@ namespace Names {
         //     out += 'R';
         //     out += std::to_string(sig.repetition);
         // }
-        // Add the ID ?
-        // out += 'R';
-        // out += std::to_string(sig._unique_id);
+        // Add the ID only if action?
+        if (isAction) {
+            out += "__ID";
+            out += std::to_string(sig._unique_id);
+        }
+
         
         for (int arg : sig._args) {
             std::string arg_str = to_string(arg);

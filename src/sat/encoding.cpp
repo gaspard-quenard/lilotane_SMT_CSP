@@ -454,15 +454,21 @@ void Encoding::encodeSubstitutionVars(const USignature& opSig, int opVar, int ar
     // Log::i("INITSUBVARS @(%i,%i) %s:%s [ \n", pos.getLayerIndex(), pos.getPositionIndex(), TOSTR(opSig), TOSTR(arg));
     // Log::i("%s\n", Names::to_string(arg).c_str());
 
-    // if (Names::to_string(arg) == "Q_2,8_location:0_e4354a9774db1231") {
-    //     int dbg = 0;
-    // }
+    if (Names::to_string(arg) == "Q_3,15_location:0_1d567ea01c0f3645") {
+        // Print the action
+        Log::i("action: %s\n", Names::to_string(opSig).c_str());
+        int dbg = 0;
+    }
 
     if (!_htn.isQConstant(arg)) return;
-    if (_q_constants.count(arg)) return;
+    if (!USE_LIFTED_TREE_PATH && _q_constants.count(arg)) return;
 
     // arg is a *new* q-constant: initialize substitution logic
-    _new_q_constants.insert(arg);
+    // _new_q_constants.insert(arg);
+
+    if ((USE_LIFTED_TREE_PATH && !_q_constants.count(arg)) || !USE_LIFTED_TREE_PATH) {
+        _new_q_constants.insert(arg);
+    }
 
     std::vector<int> substitutionVars;
     if (TOSTR(opSig) == "__SURROGATE*m_drive_to_ordering_0*drive*") {
@@ -504,13 +510,34 @@ void Encoding::encodeSubstitutionVars(const USignature& opSig, int opVar, int ar
             }
         }
         for (const auto& c : bamo.encode()) {
-            __interfaceSolver__addClause(c);
+
+            if (!USE_LIFTED_TREE_PATH) {
+                __interfaceSolver__addClause(c);
+            } else {
+                if (!_q_consts_at_most_one_already_added.count(c)) {
+                    _q_consts_at_most_one_already_added.insert(c);
+                    __interfaceSolver__addClause(c);
+                }
+            }
+
+
         }
     } else {
         // Naive at-most-one
         for (int vSub1 : substitutionVars) {
             for (int vSub2 : substitutionVars) {
-                if (vSub1 < vSub2) __interfaceSolver__addClause(-vSub1, -vSub2);
+                
+                if (vSub1 < vSub2) {
+
+                    if (!USE_LIFTED_TREE_PATH) {
+                        __interfaceSolver__addClause(-vSub1, -vSub2);
+                    } else {
+                        if (!_q_consts_at_most_one_already_added.count(std::vector<int>{-vSub1, -vSub2})) {
+                            _q_consts_at_most_one_already_added.insert(std::vector<int>{-vSub1, -vSub2});
+                            __interfaceSolver__addClause(-vSub1, -vSub2);
+                        }
+                    }
+                }
             }
         }
     }
@@ -958,7 +985,7 @@ void Encoding::encode_for_lifted_tree_path_ensure_one_init_action_is_true(size_t
                 // We are sure that the first action is in the primitive tree
                 // Print for debugging
                 Log::i("First action is in the primitive tree: %s\n", Names::to_SMT_string(aSig, true).c_str());
-                cls.push_back(_vars.getVariable(VarType::OP, p, aSig));
+                cls.push_back(_vars.getVariableUniqueID(VarType::OP, p, aSig));
                 continue;
             }
 
@@ -968,7 +995,7 @@ void Encoding::encode_for_lifted_tree_path_ensure_one_init_action_is_true(size_t
             bool isRoot = true;
 
             // Iterate over all previous of this action
-            for (const auto& prev : p.getPrevious().at(aSig)) {
+            for (const auto& prev : p.getPrevious().at(aSig._unique_id)) {
                 // If the previous is not in the primitive tree
                 if (left.getActionsInPrimitiveTree().contains(prev)) {
                     isRoot = false;
@@ -980,7 +1007,7 @@ void Encoding::encode_for_lifted_tree_path_ensure_one_init_action_is_true(size_t
             if (isRoot) {
                 // Add the variable to the vector
                 Log::i("First action is in the primitive tree: %s\n", Names::to_SMT_string(aSig, true).c_str());
-                cls.push_back(_vars.getVariable(VarType::OP, p, aSig));
+                cls.push_back(_vars.getVariableUniqueID(VarType::OP, p, aSig));
             }
         }
     }
@@ -1073,6 +1100,7 @@ void Encoding::encode_for_lifted_tree_path(size_t layerIdx, size_t pos) {
     if (pos == 0) {
         _q_constants.clear();
         _vars.clearQConstantEqualityVars();
+        _q_consts_at_most_one_already_added.clear();
     }
     
 
@@ -1139,7 +1167,7 @@ void Encoding::encode_for_lifted_tree_path(size_t layerIdx, size_t pos) {
     const USigSet& axiomaticOps = newPos.getAxiomaticOps();
     if (!axiomaticOps.empty()) {
         for (const USignature& op : axiomaticOps) {
-            __interfaceSolver__appendClause(_vars.getVariable(VarType::OP, newPos, op));
+            __interfaceSolver__appendClause(_vars.getVariableUniqueID(VarType::OP, newPos, op));
         }
         __interfaceSolver__endClause();
     }
@@ -1158,18 +1186,18 @@ void Encoding::encodePrimActionTrueImpliesOneNextPrimActionIsTrue(Position& left
     for (USignature aSig : left.getActionsInPrimitiveTree()) {
 
         // Get the ID of this action
-        int aVar = _vars.getVariable(VarType::OP, left, aSig);
+        int aVar = _vars.getVariableUniqueID(VarType::OP, left, aSig);
 
         __interfaceSolver__appendClause(-aVar);
 
         // Get all the nexts of this action (which are among the current position)
-        for (const auto& nextAction :left.getNexts().at(aSig)) {
+        for (const auto& nextAction :left.getNexts().at(aSig._unique_id)) {
 
             // Check if the next action is in the primitive tree
             if (!pos.getActionsInPrimitiveTree().contains(nextAction)) continue;
 
             // Get the ID of this next
-            int nextVar = _vars.getVariable(VarType::OP, pos, nextAction);
+            int nextVar = _vars.getVariableUniqueID(VarType::OP, pos, nextAction);
 
             __interfaceSolver__appendClause(nextVar);
         }
@@ -1250,6 +1278,9 @@ void Encoding::encodeOperationVariables_LiftedTreePath(Position& newPos) {
 
     _stats.begin(STAGE_ACTIONCONSTRAINTS);
     for (const auto& aSig : newPos.getActionsInPrimitiveTree()) {
+
+        // To debug, print the action
+        // Log::i("Action: %s\n", Names::to_SMT_string(aSig).c_str());
 
         // // Confirm that this action is part of the primitive tree
         // if (newPos.getActionsInPrimitiveTree().count(aSig) == 0) {
@@ -1380,7 +1411,7 @@ void Encoding::encodeFrameAxioms_LiftedTreePath(Position& newPos, Position& left
 
     int layerIdx = newPos.getLayerIndex();
     int pos = newPos.getPositionIndex();
-    int prevVarPrim = _vars.getVarPrimitiveOrZero(layerIdx, pos-1);
+    // int prevVarPrim = _vars.getVarPrimitiveOrZero(layerIdx, pos-1);
 
     // Check if frame axioms can be skipped because
     // the above position had a superset of operations
@@ -1469,7 +1500,8 @@ void Encoding::encodeFrameAxioms_LiftedTreePath(Position& newPos, Position& left
                 if (!nonprimFactSupport) {
                     if (_implicit_primitiveness) {
                         for (int var : _nonprimitive_ops) cls.push_back(var);
-                    } else if (prevVarPrim != 0) cls.push_back(-prevVarPrim);
+                    } 
+                    // else if (prevVarPrim != 0) cls.push_back(-prevVarPrim);
                 }
                 // INDIRECT support
                 if (indir[i] != nullptr) {                    
@@ -1482,9 +1514,9 @@ void Encoding::encodeFrameAxioms_LiftedTreePath(Position& newPos, Position& left
                         if (dir[i] != nullptr && dir[i]->count(op)) continue;
 
                         // Encode substitutions enabling indirect support for this fact
-                        int opVar = left.getVariableOrZero(VarType::OP, op);
+                        int opVar = left.getVariableOrZeroUniqueID(VarType::OP, op);
                         USignature virtOp(_htn.getRepetitionNameOfAction(op._name_id), op._args);
-                        int virtOpVar = left.getVariableOrZero(VarType::OP, virtOp);
+                        int virtOpVar = left.getVariableOrZeroUniqueID(VarType::OP, virtOp);
                         if (opVar != 0) {
                             atLeastOneAction = true;
                             cls.push_back(opVar);
@@ -1499,7 +1531,7 @@ void Encoding::encodeFrameAxioms_LiftedTreePath(Position& newPos, Position& left
                 }
                 // DIRECT support
                 if (dir[i] != nullptr) for (const USignature& opSig : *dir[i]) {
-                    int opVar = left.getVariableOrZero(VarType::OP, opSig);
+                    int opVar = left.getVariableOrZeroUniqueID(VarType::OP, opSig);
 
                     // The op must be an action in the primitive tree
                     if (!left.getActionsInPrimitiveTree().contains(opSig)) continue;
@@ -1508,7 +1540,7 @@ void Encoding::encodeFrameAxioms_LiftedTreePath(Position& newPos, Position& left
 
                     if (opVar != 0) cls.push_back(opVar);
                     USignature virt = opSig.renamed(_htn.getRepetitionNameOfAction(opSig._name_id));
-                    int virtOpVar = left.getVariableOrZero(VarType::OP, virt);
+                    int virtOpVar = left.getVariableOrZeroUniqueID(VarType::OP, virt);
                     if (virtOpVar != 0) cls.push_back(virtOpVar);
                 }
             }
@@ -1541,12 +1573,12 @@ void Encoding::encodeOperationConstraints_LiftedTreePath(Position& newPos) {
     int numOccurringOps = 0;
 
     _stats.begin(STAGE_ACTIONCONSTRAINTS);
-    for (const auto& aSig : newPos.getActions()) {
+    for (const auto& aSig : newPos.getActionsInPrimitiveTree()) {
 
         // If the action is not in the primitive tree, skip it
-        if (newPos.getActionsInPrimitiveTree().count(aSig) == 0) continue;
+        // if (newPos.getActionsInPrimitiveTree().count(aSig) == 0) continue;
 
-        int aVar = _vars.getVariable(VarType::OP, newPos, aSig);
+        int aVar = _vars.getVariableUniqueID(VarType::OP, newPos, aSig);
         elementVars[numOccurringOps++] = aVar;
         
         if (_htn.isActionRepetition(aSig._name_id)) {
@@ -1567,8 +1599,8 @@ void Encoding::encodeOperationConstraints_LiftedTreePath(Position& newPos) {
 
         // Preconditions
         for (const Signature& pre : _htn.getOpTable().getAction(aSig).getPreconditions()) {
-            if (!_vars.isEncoded(VarType::FACT, layerIdx, pos, pre._usig)) continue;
-            __interfaceSolver__addClause(-aVar, (pre._negated?-1:1)*_vars.getVariable(VarType::FACT, newPos, pre._usig));
+            if (!_vars.isEncodedUniqueID(VarType::FACT, layerIdx, pos, pre._usig)) continue;
+            __interfaceSolver__addClause(-aVar, (pre._negated?-1:1)*_vars.getVariableUniqueID(VarType::FACT, newPos, pre._usig));
         }
     }
     _stats.end(STAGE_ACTIONCONSTRAINTS);
@@ -1622,7 +1654,7 @@ void Encoding::encodeQFactSemantics_LiftedTreePath(Position& newPos) {
     for (const auto& qfactSig : newPos.getQFacts()) {
         assert(_htn.hasQConstants(qfactSig));
         
-        int qfactVar = _vars.getVariable(VarType::FACT, newPos, qfactSig);
+        int qfactVar = _vars.getVariableUniqueID(VarType::FACT, newPos, qfactSig);
 
         for (int sign = -1; sign <= 1; sign += 2) {
             bool negated = sign < 0;
@@ -1688,18 +1720,18 @@ void Encoding::encodeActionEffects_LiftedTreePath(Position& newPos, Position& le
 
     bool treeConversion = _params.isNonzero("tc");
     _stats.begin(STAGE_ACTIONEFFECTS);
-    for (const auto& aSig : left.getActions()) {
+    for (const auto& aSig : left.getActionsInPrimitiveTree()) {
 
         // If the action is not in the primitive tree, skip it
-        if (left.getActionsInPrimitiveTree().count(aSig) == 0) continue;
+        // if (left.getActionsInPrimitiveTree().count(aSig) == 0) continue;
 
         // if (_htn.isActionRepetition(aSig._name_id)) continue;
-        int aVar = _vars.getVariable(VarType::OP, left, aSig);
+        int aVar = _vars.getVariableUniqueID(VarType::OP, left, aSig);
 
         const SigSet& effects = _htn.getOpTable().getAction(aSig).getEffects();
 
         for (const Signature& eff : effects) {
-            if (!_vars.isEncoded(VarType::FACT, _layer_idx, _pos, eff._usig)) continue;
+            if (!_vars.isEncodedUniqueID(VarType::FACT, _layer_idx, _pos, eff._usig)) continue;
 
             std::set<std::set<int>> unifiersDnf;
             bool unifiedUnconditionally = false;
@@ -1707,7 +1739,7 @@ void Encoding::encodeActionEffects_LiftedTreePath(Position& newPos, Position& le
                 for (const auto& posEff : effects) {
                     if (posEff._negated) continue;
                     if (posEff._usig._name_id != eff._usig._name_id) continue;
-                    if (!_vars.isEncoded(VarType::FACT, _layer_idx, _pos, posEff._usig)) continue;
+                    if (!_vars.isEncodedUniqueID(VarType::FACT, _layer_idx, _pos, posEff._usig)) continue;
 
                     bool fits = true;
                     std::set<int> s;
@@ -1741,7 +1773,7 @@ void Encoding::encodeActionEffects_LiftedTreePath(Position& newPos, Position& le
             if (unifiedUnconditionally) continue; // Always unified
             if (unifiersDnf.empty()) {
                 // Positive or ununifiable negative effect: enforce it
-                __interfaceSolver__addClause(-aVar, (eff._negated?-1:1)*_vars.getVariable(VarType::FACT, newPos, eff._usig));
+                __interfaceSolver__addClause(-aVar, (eff._negated?-1:1)*_vars.getVariableUniqueID(VarType::FACT, newPos, eff._usig));
                 continue;
             }
 
@@ -1751,7 +1783,7 @@ void Encoding::encodeActionEffects_LiftedTreePath(Position& newPos, Position& le
                 for (const auto& set : unifiersDnf) tree.insert(std::vector<int>(set.begin(), set.end()));
                 std::vector<int> headerLits;
                 headerLits.push_back(aVar);
-                headerLits.push_back(_vars.getVariable(VarType::FACT, newPos, eff._usig));
+                headerLits.push_back(_vars.getVariableUniqueID(VarType::FACT, newPos, eff._usig));
                 for (const auto& cls : tree.encode(headerLits)) __interfaceSolver__addClause(cls);
             } else {
                 std::vector<int> dnf;
@@ -1761,7 +1793,7 @@ void Encoding::encodeActionEffects_LiftedTreePath(Position& newPos, Position& le
                 }
                 auto cnf = Dnf2Cnf::getCnf(dnf);
                 for (const auto& clause : cnf) {
-                    __interfaceSolver__appendClause(-aVar, -_vars.getVariable(VarType::FACT, newPos, eff._usig));
+                    __interfaceSolver__appendClause(-aVar, -_vars.getVariableUniqueID(VarType::FACT, newPos, eff._usig));
                     for (int lit : clause) __interfaceSolver__appendClause(lit);
                     __interfaceSolver__endClause();
                 }
@@ -1780,7 +1812,7 @@ void Encoding::encodeQConstraints_LiftedTreePath(Position& newPos) {
     _stats.begin(STAGE_QTYPECONSTRAINTS);
     const auto& constraints = newPos.getQConstantsTypeConstraints();
     for (const auto& [opSig, constraints] : constraints) {
-        int opVar = newPos.getVariableOrZero(VarType::OP, opSig);
+        int opVar = newPos.getVariableOrZeroUniqueID(VarType::OP, opSig);
         if (opVar != 0) {
             for (const TypeConstraint& c : constraints) {
                 int qconst = c.qconstant;
@@ -1810,11 +1842,12 @@ void Encoding::encodeQConstraints_LiftedTreePath(Position& newPos) {
 
     // For each operation (action or reduction)
     // const USigSet* ops[2] = {&newPos.getActions(), &newPos.getReductions()};
-    const USigSet* ops[1] = {&newPos.getActions()};
-    for (const auto& set : ops) for (auto opSig : *set) {
+    // const USigSetUniqueID* ops[1] = {&newPos.getActionsWithUniqueID()};
+    // for (const auto& set : ops) for (auto opSig : *set) {
+    for (auto& opSig : newPos.getActionsInPrimitiveTree()) {
 
         // If the operation is not in the primitive tree, skip it
-        if (newPos.getActionsInPrimitiveTree().count(opSig) == 0) continue;
+        // if (newPos.getActionsInPrimitiveTree().count(opSig) == 0) continue;
 
         auto it = newPos.getSubstitutionConstraints().find(opSig);
         if (it == newPos.getSubstitutionConstraints().end()) continue;
@@ -1825,7 +1858,7 @@ void Encoding::encodeQConstraints_LiftedTreePath(Position& newPos) {
             for (const auto& cls : f) {
                 //std::string out = (polarity == SubstitutionConstraint::ANY_VALID ? "+" : "-") + std::string("SUBSTITUTION ") 
                 //        + Names::to_string(opSig) + " ";
-                __interfaceSolver__appendClause(-_vars.getVariable(VarType::OP, newPos, opSig));
+                __interfaceSolver__appendClause(-_vars.getVariableUniqueID(VarType::OP, newPos, opSig));
                 for (const auto& [qArg, decArg] : cls) {
                     bool negated = qArg < 0;
                     //out += (negated ? "-" : "+")
@@ -1866,7 +1899,13 @@ void Encoding::encodeQConstraints_LiftedTreePath(Position& newPos) {
 /*************INTERFACE WITH THE SOLVER*************/
 
 int Encoding::__interfaceSolver__encodeVariable(VarType type, Position& pos, const USignature& sig) {
-    int var = _vars.encodeVariable(type, pos, sig);
+    int var;
+    if (USE_LIFTED_TREE_PATH) {
+        var = _vars.encodeVariableUniqueID(type, pos, sig);
+    } else {
+        var = _vars.encodeVariable(type, pos, sig);
+    }
+    // int var = _vars.encodeVariable(type, pos, sig);
 
     if (_useSMTSolver) {
         _smt.addVar(var, Names::to_SMT_string(sig, _htn.isAction(sig)), pos.getLayerIndex(), pos.getPositionIndex());
@@ -1876,7 +1915,13 @@ int Encoding::__interfaceSolver__encodeVariable(VarType type, Position& pos, con
 }
 
 int Encoding::__interfaceSolver__encodeVarPrimitive(int layer, int pos) {
-    int var = _vars.encodeVarPrimitive(layer, pos);
+    // int var = _vars.encodeVarPrimitive(layer, pos);
+    int var;
+    if (USE_LIFTED_TREE_PATH) {
+        var = _vars.encodeVarPrimitiveUniqueID(layer, pos);
+    } else {
+        var = _vars.encodeVarPrimitive(layer, pos);
+    }
 
     if (_useSMTSolver) {
         _smt.addVar(var, "__PRIMITIVE___", layer, pos);

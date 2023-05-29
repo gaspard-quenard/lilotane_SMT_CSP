@@ -2,6 +2,7 @@
 // PandaPIparser
 #include "plan.hpp"
 #include "verify.hpp"
+#include "sat/variable_domain.h"
 
 #include "algo/plan_writer.h"
 
@@ -16,6 +17,8 @@ void PlanWriter::outputPlan(Plan& _plan) {
     stream << "==>\n";
     FlatHashSet<int> actionIds;
     FlatHashSet<int> idsToRemove;
+
+    FlatHashMap<int, int> surroageToMethodParent;
 
     FlatHashSet<int> primitivizationIds;
     std::vector<PlanItem> decompsToInsert;
@@ -41,13 +44,18 @@ void PlanWriter::outputPlan(Plan& _plan) {
             
             PlanItem parent;
             parent.abstractTask = parentRed.getTaskSignature();  
-            parent.id = item.id-1;
+            // parent.id = item.id-1;
+            parent.id = VariableDomain::nextVar();
             parent.reduction = parentRed.getSignature();
             parent.subtaskIds = std::vector<int>(1, item.id);
             decompsToInsert.push_back(parent);
 
+            surroageToMethodParent[item.id] = parent.id;
+
             const USignature& childSig = parentRed.getSubtasks()[0];
-            item.abstractTask = childSig;
+            USignature childSigCopy = childSig;
+            childSigCopy._unique_id = item.id;
+            item.abstractTask = childSigCopy;
         }
 
         actionIds.insert(item.id);
@@ -57,6 +65,7 @@ void PlanWriter::outputPlan(Plan& _plan) {
         if (item.abstractTask._name_id == _htn.nameId("<goal_action>")) continue;
 
         stream << item.id << " " << Names::to_string_nobrackets(_htn.cutNonoriginalTaskArguments(item.abstractTask)) << "\n";
+        // Log::i("Stream: \n%s\n", stream.str().c_str());
         length++;
     }
     // -- decomposition part
@@ -78,7 +87,12 @@ void PlanWriter::outputPlan(Plan& _plan) {
 
         std::string subtaskIdStr = "";
         for (int subtaskId : item.subtaskIds) {
-            if (item.id+1 != subtaskId && primitivizationIds.count(subtaskId)) subtaskId--;
+            // if (item.id+1 != subtaskId && primitivizationIds.count(subtaskId)) subtaskId--;
+            if (surroageToMethodParent.count(subtaskId)) {
+                int surroageActionId = subtaskId;
+                subtaskId = surroageToMethodParent[subtaskId];
+                surroageToMethodParent.erase(surroageActionId);
+            }
             if (!idsToRemove.count(subtaskId)) subtaskIdStr += " " + std::to_string(subtaskId);
         }
         
@@ -90,6 +104,9 @@ void PlanWriter::outputPlan(Plan& _plan) {
         
         stream << item.id << " " << Names::to_string_nobrackets(_htn.cutNonoriginalTaskArguments(item.abstractTask)) << " -> " 
             << Names::to_string_nobrackets(item.reduction) << subtaskIdStr << "\n";
+
+        // Log::i("Stream: \n%s\n", stream.str().c_str());
+        // int a = 0;
     }
     stream << "<==\n";
 

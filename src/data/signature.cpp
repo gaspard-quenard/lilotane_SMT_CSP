@@ -4,8 +4,8 @@
 USignature::USignature() = default;
 USignature::USignature(int nameId, const std::vector<int>& args) : _name_id(nameId), _args(args) {}
 USignature::USignature(int nameId, std::vector<int>&& args) : _name_id(nameId), _args(std::move(args)) {}
-USignature::USignature(const USignature& sig) : _name_id(sig._name_id), _args(sig._args), _unique_id(sig._unique_id) {}
-USignature::USignature(USignature&& sig) : _name_id(sig._name_id), _args(std::move(sig._args)), _unique_id(sig._unique_id) {}
+USignature::USignature(const USignature& sig) : _name_id(sig._name_id), _args(sig._args), _unique_id(sig._unique_id), last_parent_method_id(sig.last_parent_method_id) {}
+USignature::USignature(USignature&& sig) : _name_id(sig._name_id), _args(std::move(sig._args)), _unique_id(sig._unique_id), last_parent_method_id(sig.last_parent_method_id) {}
 
 long long int USignature::nextID = 0;  // Definition of the static variable
 

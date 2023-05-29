@@ -9,6 +9,7 @@ IndirectFactSupportMap Position::EMPTY_INDIRECT_FACT_SUPPORT_MAP;
 
 Position::Position() : _layer_idx(-1), _pos(-1) {}
 void Position::setPos(size_t layerIdx, size_t pos) {_layer_idx = layerIdx; _pos = pos;}
+void Position::setAbovePos(size_t abovePos) {_above_pos = abovePos;}
 
 void Position::addQFact(const USignature& qfact) {
     _qfacts.insert(qfact);
@@ -107,15 +108,15 @@ void Position::addReduction(const USignature& reduction) {
 }
 void Position::addExpansion(const USignature& parent, const USignature& child) {
 
-    // if (child._unique_id == 366 || child._unique_id == 364) {
+    // if (child._unique_id == 366) {
     //     int dbg = 0;
-    //     USignature copy = child;
-    //     copy._unique_id = 366;
+    //     // USignature copy = child;
+    //     // copy._unique_id = 366;
     //     // Check if it is in the set
-    //     auto& predUniqueId = _predecessors_with_unique_id[copy];
-    //     if (predUniqueId.size() > 0) {
-    //         int dbg = 0;
-    //     }
+    //     // auto& predUniqueId = _predecessors_with_unique_id[copy];
+    //     // if (predUniqueId.size() > 0) {
+    //     //     int dbg = 0;
+    //     // }
     // }
 
     auto& set = _expansions[parent];
@@ -164,18 +165,18 @@ void Position::addPrevious(const USignature& current, const USignature& previous
     if (previous._unique_id == 130) {
         int dbg = 0;
     }
-    auto& set = _previous[current];
+    auto& set = _previous[current._unique_id];
     set.insert(previous);
 }
 
 void Position::addNexts(const USignature& current, const USignature& next) {
-    auto& set = _nexts[current];
+    auto& set = _nexts[current._unique_id];
     set.insert(next);
 }
 
-void Position::addLastParentMethodId(const USignature& current, int lastParentMethodId) {
-    _last_parent_method_id[current] = lastParentMethodId;
-}
+// void Position::addLastParentMethodId(const USignature& current, int lastParentMethodId) {
+//     _last_parent_method_id[current] = lastParentMethodId;
+// }
 
 void Position::addActionInPrimitiveTree(const USignature& action) {
     _actions_in_primitive_tree.insert(action);
@@ -186,6 +187,14 @@ void Position::removeActionInPrimitiveTree(const USignature& action) {
     if (_actions_in_primitive_tree.count(action)) {
         _actions_in_primitive_tree.erase(action);
     }
+}
+
+void Position::setActionOrReductionTrue(USignature& actionOrReduction) {
+    actionOrReductionTrue = actionOrReduction;
+}
+
+USignature& Position::getActionOrReductionTrue() {
+    return actionOrReductionTrue;
 }
 // END TEST ================================================
 
@@ -230,6 +239,11 @@ void Position::replaceOperation(const USignature& from, const USignature& to, Su
 const NodeHashMap<USignature, int, USignatureHasher>& Position::getVariableTable(VarType type) const {
     return type == OP ? _op_variables : _fact_variables;
 }
+
+const NodeHashMap<USignature, int, USignatureHasherWithUniqueID, USignatureEqualityWithUniqueID>& Position::getVariableTableOPUniqueID() const {
+    return _op_variables_unique_id;
+}
+
 void Position::setVariableTable(VarType type, const NodeHashMap<USignature, int, USignatureHasher>& table) {
     if (type == OP) {
         _op_variables = table;
@@ -251,6 +265,7 @@ bool Position::hasReduction(const USignature& red) const {return _reductions.cou
 
 size_t Position::getLayerIndex() const {return _layer_idx;}
 size_t Position::getPositionIndex() const {return _pos;}
+size_t Position::getAbovePositionIndex() const {return _above_pos;}
 
 const USigSet& Position::getQFacts() const {return _qfacts;}
 const USigSet& Position::getTrueFacts() const {return _true_facts;}
@@ -278,7 +293,7 @@ const NodeHashMap<USignature, std::vector<TypeConstraint>, USignatureHasher>& Po
 USigSet& Position::getActions() {return _actions;}
 USigSetUniqueID& Position::getActionsWithUniqueID() {return _actionsWithUniqueID;}
 USigSet& Position::getReductions() {return _reductions;}
-NodeHashMap<USignature, USigSet, USignatureHasherWithUniqueID>& Position::getExpansions() {return _expansions;}
+NodeHashMap<USignature, USigSetUniqueID, USignatureHasherWithUniqueID, USignatureEqualityWithUniqueID>& Position::getExpansions() {return _expansions;}
 NodeHashMap<USignature, USigSet, USignatureHasher>& Position::getPredecessors() {return _predecessors;}
 // NodeHashMap<USignature, USigSetUniqueID, USignatureHasherWithUniqueID>& Position::getPredecessorsWithUniqueID() {return _predecessors_with_unique_id;}
 NodeHashMap<int, USigSetUniqueID>& Position::getPredecessorsWithUniqueID() {return _predecessors_with_unique_id;}
@@ -287,10 +302,10 @@ const USigSet& Position::getAxiomaticOps() const {return _axiomatic_ops;}
 size_t Position::getMaxExpansionSize() const {return _max_expansion_size;}
 
 // TEST
-NodeHashMap<USignature, USigSet, USignatureHasher>& Position::getPrevious() {return _previous;}
-NodeHashMap<USignature, USigSet, USignatureHasher>& Position::getNexts() {return _nexts;}
-NodeHashMap<USignature, int, USignatureHasher>& Position::getLastParentMethodId() {return _last_parent_method_id;}
-NodeHashSet<USignature, USignatureHasher>& Position::getActionsInPrimitiveTree() {return _actions_in_primitive_tree;}
+NodeHashMap<int, USigSetUniqueID>& Position::getPrevious() {return _previous;}
+NodeHashMap<int, USigSetUniqueID>& Position::getNexts() {return _nexts;}
+// NodeHashMap<USignature, int, USignatureHasher>& Position::getLastParentMethodId() {return _last_parent_method_id;}
+NodeHashSet<USignature, USignatureHasherWithUniqueID, USignatureEqualityWithUniqueID>& Position::getActionsInPrimitiveTree() {return _actions_in_primitive_tree;}
 // END TEST
 
 void Position::clearAfterInstantiation() {

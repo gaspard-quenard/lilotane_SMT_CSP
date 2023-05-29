@@ -51,6 +51,9 @@ private:
     const bool _use_q_constant_mutexes;
     const bool _implicit_primitiveness;
 
+    bool USE_LIFTED_TREE_PATH;
+    robin_hood::unordered_flat_set<std::vector<int>> _q_consts_at_most_one_already_added;
+
     const bool _useSMTSolver;
 
     float _sat_call_start_time;
@@ -64,6 +67,7 @@ public:
             _decoder(_htn, _layers, _sat, _smt, _vars, _params.getIntParam("smt") > 0),
             _termination_callback(terminationCallback),
             _use_q_constant_mutexes(_params.getIntParam("qcm") > 0), 
+            USE_LIFTED_TREE_PATH(_params.isNonzero("useLiftedTreePathEncoder")),
             _implicit_primitiveness(params.isNonzero("ip")) {}
 
     void encode(size_t layerIdx, size_t pos);
@@ -86,8 +90,14 @@ public:
     // ENd for lifted tree path
 
     Plan extractPlan() {
-        return _decoder.extractPlan();
+        if (USE_LIFTED_TREE_PATH) {
+            return _decoder.extractPlanLiftedTreePath();
+        } else {
+            return _decoder.extractPlan();
+        }
+        
     }
+    
     void printStatistics() {
         if (_useSMTSolver) {
             _smt_stats.printStages();

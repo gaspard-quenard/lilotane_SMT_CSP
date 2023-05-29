@@ -7,6 +7,7 @@
 #include "util/timer.h"
 #include "sat/plan_optimizer.h"
 #include "data/primitive_tree.h"
+#include "data/signature.h"
 
 int terminateSatCall(void* state) {return ((Planner*) state)->getTerminateSatCall();}
 
@@ -24,7 +25,7 @@ int Planner::findPlan() {
 
     bool solved = false;
     _enc.setTerminateCallback(this, terminateSatCall);
-    if (iteration >= firstSatCallIteration) {
+    if (!USE_LIFTED_TREE_PATH && iteration >= firstSatCallIteration) {
         _enc.addAssumptions(_layer_idx);
         int result = _enc.solve();
         if (result == 0) {
@@ -64,7 +65,7 @@ int Planner::findPlan() {
         bool isOk = createNextLayer();
 
         // TEST LIFTED TREE PATH
-        if (USE_LIFTED_TREE_PATH && (iteration == 1 || !isOk)) {
+        if (USE_LIFTED_TREE_PATH && (iteration < 1 || !isOk)) {
             continue;
         }
         // END TEST LIFTED TREE PATH
@@ -205,6 +206,7 @@ void Planner::createFirstLayer() {
         if (rOpt) {
             auto& r = rOpt.value();
             USignature sig = r.getSignature();
+            sig.setNextId();
             initLayer[_pos].addReduction(sig);
             initLayer[_pos].addAxiomaticOp(sig);
             initLayer[_pos].addExpansionSize(r.getSubtasks().size());
@@ -222,6 +224,7 @@ void Planner::createFirstLayer() {
     // Create virtual goal action
     Action goalAction = _htn.getGoalAction();
     USignature goalSig = goalAction.getSignature();
+    goalSig.setNextId();
     initLayer[_pos].addAction(goalSig);
     initLayer[_pos].addAxiomaticOp(goalSig);
     addPreconditionConstraints();
@@ -232,8 +235,11 @@ void Planner::createFirstLayer() {
     initLayer[1].clearAfterInstantiation();
 
     _pos = 0;
-    _enc.encode(_layer_idx, _pos++);
-    _enc.encode(_layer_idx, _pos++);
+    if (!USE_LIFTED_TREE_PATH) {
+        _enc.encode(_layer_idx, _pos++);
+        _enc.encode(_layer_idx, _pos++);
+    }
+
     initLayer.consolidate();
 }
 
@@ -280,13 +286,18 @@ bool Planner::createNextLayer() {
     // Get the size of the new layer
     Log::i("New layer size: %i\n", newLayer.size());
 
-    // LIFTED TREE PATH TEST
-    // IF USE PRIMITIVE TREE
     if (USE_LIFTED_TREE_PATH) {
         
         computePreviousesAndNextsFlows(newLayer, _layer_idx);
-        // PrimitiveTree primitiveTree = PrimitiveTree(_layer_idx);
+
+        // Compute the time of the following function
+        auto start = std::chrono::high_resolution_clock::now();
         bool primitiveTreeIsNotEmpty = constructPrimitiveTree(newLayer, _layer_idx);
+        auto stop = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
+        long long int time_ms = duration.count();
+
+        Log::i("Primitive tree construction took %lld ms\n", time_ms);
 
         _enc.__interfaceSolver__reset();
 
@@ -370,33 +381,51 @@ void Planner::computePreviousesAndNextsFlows(Layer& layer, int layerIdx) {
         // }
 
         // Print the above position and all the action in this position
-        Log::i("Current pos: %i\n", newPos.getPositionIndex());
-        for (USignature& aSig : newPos.getActionsWithUniqueID()) {
-            if (aSig._unique_id == 130) {
-                int a = 0;
-            }
-            Log::i("  Action: %s(%i)\n", Names::to_SMT_string(aSig).c_str(), aSig._unique_id);
-            // Check if we have the ID 130 in the previous
-            if (newPos.getPrevious().count(aSig) > 0) {
-                for (USignature& aSig : newPos.getPrevious().at(aSig)) {
-                    if (aSig._unique_id == 130) {
-                        int a = 0;
-                    }
-                }
-            }
-            
-        }
+        // Log::i("Current pos: %i\n", newPos.getPositionIndex());
+        // for (USignature& aSig : newPos.getActionsWithUniqueID()) {
+        //     if (aSig._unique_id == 366) {
+        //         int a = 0;
+        //     }
+        //     Log::i("  Action: %s(%i)\n", Names::to_SMT_string(aSig).c_str(), aSig._unique_id);
+        //     // Check if we have the ID 130 in the previous
+        //     if (newPos.getPrevious().count(aSig._unique_id) > 0) {
+        //         for (USignature& aSig : newPos.getPrevious().at(aSig._unique_id)) {
+        //             if (aSig._unique_id == 366) {
+        //                 int a = 0;
+        //             }
+        //         }
+        //     }  
+        // }
+
+        // if (layerIdx == 4 && posIdx == 70) {
+        //     int a = 0;
+        // }
 
 
 
 
-        Log::i("Above pos: %i\n", above.getPositionIndex());
-        for (USignature& aSig : above.getActionsWithUniqueID()) {
-            if (aSig._unique_id == 130) {
-                int a = 0;
-            }
-            Log::i("  Action: %s(%i)\n", Names::to_SMT_string(aSig).c_str(), aSig._unique_id);
-        }
+        // Log::i("Above pos: %i\n", above.getPositionIndex());
+        // for (USignature& aSig : above.getActionsWithUniqueID()) {
+        //     if (aSig._unique_id == 366) {
+        //         int a = 0;
+        //         // Test something, get all the nexts of this child, then verity that in the next position, all the previous of the nexts contains this child
+        //         USigSetUniqueID& nexts = above.getNexts().at(aSig._unique_id);
+        //         Position& nextPosAbove = (*_layers.at(layerIdx-1))[above.getPositionIndex()+1];
+        //         for (USignature& next : nexts) {
+        //             USigSetUniqueID& previouses = nextPosAbove.getPrevious().at(next._unique_id);
+        //             // Verify that it contains the correct id of this child
+        //             bool found = false;
+        //             for (USignature& previous : previouses) {
+        //                 if (previous._unique_id == aSig._unique_id) {
+        //                     found = true;
+        //                     break;
+        //                 }
+        //             }
+        //             assert(found);
+        //         }
+        //     }
+        //     Log::i("  Action: %s(%i)\n", Names::to_SMT_string(aSig).c_str(), aSig._unique_id);
+        // }
 
         
 
@@ -466,8 +495,17 @@ void Planner::computePreviousesAndNextsFlows(Layer& layer, int layerIdx) {
 
                      for (USignature& childCurrent : children) {
 
+                        if (childPrevious._unique_id == 366) {
+                            int dbg = 0;
+                        }
+
                         lastPos.addNexts(childPrevious, childCurrent);
                         newPos.addPrevious(childCurrent, childPrevious);
+
+                        if (childPrevious._unique_id == 366) {
+                            int numNexts = lastPos.getNexts().at(childPrevious._unique_id).size();
+                            int dbg = 0;
+                        }
 
                         std::string childPreviousName = Names::to_SMT_string(childPrevious, false);
                         std::string childCurrentName = Names::to_SMT_string(childCurrent, false);
@@ -480,8 +518,8 @@ void Planner::computePreviousesAndNextsFlows(Layer& layer, int layerIdx) {
             } else {
                 // It means that we are the first children of this parent
                 // We need to check if this parent has previouses flows (and if so, the last children of those previouses flows)
-                if (above.getPrevious().contains(parent)) {
-                    for (auto& previousParent : above.getPrevious().at(parent)) {
+                if (above.getPrevious().contains(parent._unique_id)) {
+                    for (auto& previousParent : above.getPrevious().at(parent._unique_id)) {
                         // Check if the parent has children in the previous position
 
                         // We need the id of the previous parent
@@ -498,7 +536,7 @@ void Planner::computePreviousesAndNextsFlows(Layer& layer, int layerIdx) {
                             Log::i("NONONONON for %s(%i)\n", Names::to_SMT_string(previousParent, false).c_str(), previousParent._unique_id);
 
                             // Print all the previous of above
-                            for (USignature& previous : above.getPrevious().at(parent)) {
+                            for (USignature& previous : above.getPrevious().at(parent._unique_id)) {
                                 std::string previousName = Names::to_SMT_string(previous, false);
                                 Log::i("Previous of %s(%i): %s(%i)\n", parentName.c_str(), parent._unique_id, previousName.c_str(), previous._unique_id);
                             }
@@ -509,9 +547,20 @@ void Planner::computePreviousesAndNextsFlows(Layer& layer, int layerIdx) {
                         for (USignature& childPrevious : childrenIsPreviousesPosition.at(idPreviousParent)) {
                             for (USignature& childCurrent : children) {
 
+                                // if (childPrevious._unique_id == 366) {
+                                //     int numNexts = lastPos.getNexts().at(childPrevious._unique_id).size();
+                                //     int dbg = 0;
+                                // }
+
                                 // Add the nexts
                                 lastPos.addNexts(childPrevious, childCurrent);
                                 newPos.addPrevious(childCurrent, childPrevious);
+
+                                if (childPrevious._unique_id == 366) {
+                                    int numNexts = lastPos.getNexts().at(childPrevious._unique_id).size();
+                                    int numPrevious = newPos.getPrevious().at(childCurrent._unique_id).size();
+                                    int dbg = 0;
+                                }
 
                                 std::string childPreviousName = Names::to_SMT_string(childPrevious, false);
                                 std::string childCurrentName = Names::to_SMT_string(childCurrent, false);
@@ -532,6 +581,10 @@ void Planner::computePreviousesAndNextsFlows(Layer& layer, int layerIdx) {
         for (auto& [parent, children] : newPos.getExpansions()) {
 
             Log::i("Parent: %s(%i)\n", Names::to_SMT_string(parent, false).c_str(), parent._unique_id);
+
+            // if (parent._unique_id == 364) {
+            //     int dbg = 0;
+            // }
 
             // Get the id of the parent
             // int idParent = above.getVariable(VarType::OP, parent);
@@ -561,7 +614,7 @@ void Planner::computePreviousesAndNextsFlows(Layer& layer, int layerIdx) {
                 }
                 assert(newPos.getPredecessorsWithUniqueID().at(child._unique_id).size() == 1);
 
-                if (child._unique_id == 130) {
+                if (child._unique_id == 366) {
                     int dbf = 0;
                 }
 
@@ -579,7 +632,7 @@ void Planner::computePreviousesAndNextsFlows(Layer& layer, int layerIdx) {
 */
 bool Planner::constructPrimitiveTree(Layer& layer, int layerIdx) {
 
-    robin_hood::unordered_set<USignature, USignatureHasher> flowsAlreadySeen;
+    robin_hood::unordered_set<int> flowsAlreadySeen;
     robin_hood::unordered_set<int> idActionsInPrimitiveTree;
 
     // Iterate over all positions
@@ -590,11 +643,11 @@ bool Planner::constructPrimitiveTree(Layer& layer, int layerIdx) {
         for (USignature& aSig : newPos.getActionsWithUniqueID()) {
 
             // Check if this action can be the beginning of the primitive tree (no previouses flows)
-            if (!newPos.getPrevious().contains(aSig)) {
+            if (!newPos.getPrevious().contains(aSig._unique_id)) {
 
                 // Indicate that this action can be the beginning of the primitive tree
                 std::string aSigName = Names::to_SMT_string(aSig, true);
-                Log::i("Action: %s (can be the beginning of the primitive tree)\n", aSigName.c_str());
+                Log::d("Action: %s (can be the beginning of the primitive tree)\n", aSigName.c_str());
 
                 recursiveComputePrimitiveTree(aSig, layer, posIdx, flowsAlreadySeen, idActionsInPrimitiveTree);
             }
@@ -614,7 +667,7 @@ bool Planner::constructPrimitiveTree(Layer& layer, int layerIdx) {
 
                 // Indicate that this action is in the primitive tree
                 std::string aSigName = Names::to_SMT_string(aSig, true);
-                Log::i("Action: %s (is part of the primitive tree)\n", aSigName.c_str());
+                Log::d("Action: %s__%i (is part of the primitive tree)\n", aSigName.c_str(), posIdx);
                 primitiveTreeIsEmpty = false;
             }
 
@@ -630,116 +683,93 @@ bool Planner::constructPrimitiveTree(Layer& layer, int layerIdx) {
         Log::i("The primitive tree is empty\n");
     }
 
-    // Create now the primitive tree 
-    // PrimitiveTree primitiveTree = PrimitiveTree(layerIdx);
-
-    // Create a dictionnary which will indicate for a UsignatureId its max step from root
-    // robin_hood::unordered_map<int, int> actionIDtoMaxStepFromRoot;
-
-    // for (int posIdx = 0; posIdx < layer.size(); posIdx++) {
-    //     Position& newPos = layer[posIdx]; 
-
-    //     // Iterate over all actions of this position
-    //     for (USignature& aSig : newPos.getActions()) {
-
-    //         // Check if this action is in the primitive tree
-    //         if (newPos.getActionsInPrimitiveTree().contains(aSig)) {
-
-    //             // We do not at repetition to the primitive tree (except for goal action)
-    //             USignature originalAction = aSig;
-    //             while (_htn.isActionRepetition(originalAction._name_id) && posIdx < layer.size() - 1) {
-    //                 Log::i("%s\n", Names::to_SMT_string(originalAction, true).c_str());
-    //                 originalAction = *newPos.getPredecessors().at(originalAction).begin();
-    //             }
-
-    //             PositionedUSig posUsigAction = PositionedUSig(layerIdx, posIdx, originalAction);
-
-    //             // Get the max step from root from this position (max of the maxStepFromRoot of all previous action in the primitiveTree + 1)
-    //             int maxStepFromRoot = 0;
-
-    //             if (newPos.getPrevious().count(aSig)){
-                    
-    //                 for (USignature previous : newPos.getPrevious().at(aSig)) {
-    //                     Position& previousPos = layer[posIdx - 1];
-
-    //                     if (previousPos.getActionsInPrimitiveTree().contains(previous)) {
-
-    //                         // Just to check, iterate over the previouses
-    //                         // for (USignature& prev : previousPos.getActions()) {
-    //                         //     int dbg = 0;
-    //                         // }
-
-
-    //                         assert(actionIDtoMaxStepFromRoot.count(previous._unique_id));
-    //                         Log::i("Previous: %s (step from root: %i)\n", Names::to_SMT_string(previous, true).c_str(), actionIDtoMaxStepFromRoot.at(previous._unique_id));
-    //                         // assert(previous.max_step_from_root >= 0);
-    //                         // maxStepFromRoot = std::max(maxStepFromRoot, previous.max_step_from_root);
-    //                         maxStepFromRoot = std::max(maxStepFromRoot, actionIDtoMaxStepFromRoot.at(previous._unique_id) + 1);
-
-
-    //                         // TODO Set the nexts as well in the primitiveTree
-    //                         // int oldMaxStepFromRoot = actionIDtoMaxStepFromRoot.at(previous._unique_id);
-    //                         // primitiveTree[oldMaxStepFromRoot].addNextAction(primitiveTree[oldMaxStepFromRoot].getActionByID(previous._unique_id), posUsigAction);
-    //                     }
-    //                 }
-    //             }
-
-                
-
-    //             // Set the max step from root
-    //             // aSig.setMaxStepFromRoot(maxStepFromRoot);
-    //             actionIDtoMaxStepFromRoot[aSig._unique_id] = maxStepFromRoot;
-                
-
-    //             // Add set it in the correct position in the primitiveTree
-    //             while (maxStepFromRoot >= primitiveTree.size()) {
-    //                 primitiveTree.createNewPos();
-    //             }
-
-    //             primitiveTree.at(maxStepFromRoot).addAction(posUsigAction);
-
-    //             // Indicate that this action is in the primitive tree
-    //             std::string aSigName = Names::to_SMT_string(originalAction, true);
-    //             Log::i("=== Action: %s (max step from root: %i)\n", aSigName.c_str(), maxStepFromRoot);
-    //             primitiveTreeIsEmpty = false;
-    //         }
-
-    //         // if (aSig.is_primitive) {
-    //         //     std::string aSigName = Names::to_SMT_string(aSig, true);
-    //         //     Log::i("Action: %s (is part of the primitive tree)\n", aSigName.c_str());
-    //         //     primitiveTreeIsEmpty = false;
-    //         // }
-    //     }
-    // }
-
-    // // Display the primitive Tree
-    // primitiveTree.prettyDisplay();
+    debug_write_all_paths_in_file(layer, layerIdx);
 
 
     return !primitiveTreeIsEmpty;
 }
 
-bool Planner::recursiveComputePrimitiveTree(USignature currentAction, Layer& layer, int posIdx, robin_hood::unordered_set<USignature, USignatureHasher>& actionsAlreadyVisited, robin_hood::unordered_set<int>& idActionsInPrimitiveTree) {
+void Planner::debug_write_all_paths_in_file(Layer& layer, int layerIdx) {
+    std::ofstream file;
+    std::string nameFile = "all_paths_" + std::to_string(layerIdx) + ".txt";
+    file.open(nameFile);
+
+    // Iterate over all positions
+    for (int posIdx = 0; posIdx < layer.size(); posIdx++) {
+        Position& newPos = layer[posIdx]; 
+        std::string posString = std::to_string(posIdx);
+        for (USignature& rSig : newPos.getReductions()) {
+            file << Names::to_SMT_string(rSig, false) << "__" << posString << " 0 0" << std::endl;
+        }
+        for (USignature& aSig : newPos.getActionsWithUniqueID()) {
+            if (newPos.getActionsInPrimitiveTree().contains(aSig)) {
+                file << Names::to_SMT_string(aSig, true) << "__" << posString << " 1 1" << std::endl;
+            } else {
+                file << Names::to_SMT_string(aSig, true) << "__" << posString << " 1 0" << std::endl;
+            }
+        }
+    }
+
+    file << std::endl;
+
+    // Now, make a second pass to indicate all the nexts
+    for (int posIdx = 0; posIdx < layer.size(); posIdx++) {
+        Position& newPos = layer[posIdx]; 
+        std::string nextPosString = std::to_string(posIdx + 1);
+        std::string posString = std::to_string(posIdx);
+        for (auto& [aSig_unique_id, nexts] : newPos.getNexts()) {
+
+            // Get the aSig
+            USignature aSig;
+            for (USignature& aSig2 : newPos.getActionsWithUniqueID()) {
+                if (aSig2._unique_id == aSig_unique_id) {
+                    aSig = aSig2;
+                    break;
+                }
+            }
+
+            // Check if it is an action
+            bool isAction = false;
+            if (_htn.isAction(aSig)) {
+                isAction = true;
+            }
+            file << Names::to_SMT_string(aSig, isAction) << "__" << posString << " ";
+            for (USignature& next : nexts) {
+                isAction = false;
+                if (_htn.isAction(next)) {
+                    isAction = true;
+                }
+                file << Names::to_SMT_string(next, isAction) << "__" << nextPosString << " ";
+            }
+            file << std::endl;
+        }
+    }
+
+    file.flush();
+    file.close();
+}
+
+bool Planner::recursiveComputePrimitiveTree(USignature currentAction, Layer& layer, int posIdx, robin_hood::unordered_set<int>& idActionsAlreadyVisited, robin_hood::unordered_set<int>& idActionsInPrimitiveTree) {
 
     std::string currentActionName = Names::to_SMT_string(currentAction, true);
-    Log::i("Action: %s\n", currentActionName.c_str());
+    // Log::i("Action: %s\n", currentActionName.c_str());
 
     // Verify that this is an action
     if (!_htn.isAction(currentAction)) {
         // currentAction.setIsPrimitive(false);
         // layer[posIdx].removeActionInPrimitiveTree(currentAction);
         // Indicate that we have already visited this action
-        actionsAlreadyVisited.insert(currentAction);
+        idActionsAlreadyVisited.insert(currentAction._unique_id);
         return false;
     }
 
     // If this node is an action and has no nexts flows, then is a a leaf of the primitive tree
-    if (!layer[posIdx].getNexts().contains(currentAction)) {
+    if (!layer[posIdx].getNexts().contains(currentAction._unique_id)) {
         // currentAction.setIsPrimitive(true);
         layer[posIdx].addActionInPrimitiveTree(currentAction);
         idActionsInPrimitiveTree.insert(currentAction._unique_id);
         // Indicate that we have already visited this action
-        actionsAlreadyVisited.insert(currentAction);
+        idActionsAlreadyVisited.insert(currentAction._unique_id);
         return true;
     }
 
@@ -753,10 +783,10 @@ bool Planner::recursiveComputePrimitiveTree(USignature currentAction, Layer& lay
     bool currentActionIsPrimitive = false;
     
     // Iterate over all the children of the current action
-    for (USignature next : layer[posIdx].getNexts().at(currentAction)) {
+    for (USignature next : layer[posIdx].getNexts().at(currentAction._unique_id)) {
 
         // Check if we have already visited this action
-        if (actionsAlreadyVisited.contains(next)) {
+        if (idActionsAlreadyVisited.contains(next._unique_id)) {
             // If we have already visited this action, then we do not have to compute it again
             // We just have to check if it is a primitive flow
             // if (next.is_primitive) {
@@ -767,7 +797,7 @@ bool Planner::recursiveComputePrimitiveTree(USignature currentAction, Layer& lay
         } else {
             // If we have not already visited this action, then we have to compute it
             // We have to check if it is a primitive flow
-            if (recursiveComputePrimitiveTree(next, layer, posIdx+1, actionsAlreadyVisited, idActionsInPrimitiveTree)) {
+            if (recursiveComputePrimitiveTree(next, layer, posIdx+1, idActionsAlreadyVisited, idActionsInPrimitiveTree)) {
                 currentActionIsPrimitive = true;
             }
         }
@@ -782,7 +812,7 @@ bool Planner::recursiveComputePrimitiveTree(USignature currentAction, Layer& lay
         // layer[posIdx].removeActionInPrimitiveTree(currentAction);
     }
     // Indicate that we have already visited this action
-    actionsAlreadyVisited.insert(currentAction);
+    idActionsAlreadyVisited.insert(currentAction._unique_id);
     return currentActionIsPrimitive;
 }
 
@@ -803,7 +833,7 @@ void Planner::createNextPosition() {
     }
 
     // Eliminate operations which are dominated by another operation
-    if (_params.isNonzero("edo")) 
+    if (!USE_LIFTED_TREE_PATH && _params.isNonzero("edo")) 
         _domination_resolver.eliminateDominatedOperations(_layers[_layer_idx]->at(_pos));
 
     // In preparation for the upcoming position,
@@ -815,6 +845,7 @@ void Planner::createNextPosition() {
 void Planner::createNextPositionFromAbove() {
     Position& newPos = (*_layers[_layer_idx])[_pos];
     newPos.setPos(_layer_idx, _pos);
+    newPos.setAbovePos(_old_pos);
     int offset = _pos - (*_layers[_layer_idx-1]).getSuccessorPos(_old_pos);
     //eliminateInvalidParentsAtCurrentState(offset);
     if (USE_LIFTED_TREE_PATH) {
@@ -1267,6 +1298,10 @@ void Planner::propagateActionsWithUniqueID(size_t offset) {
 
                 vChildSig.setNextId();
 
+                if (vChildSig._unique_id == 366) {
+                    int a = 0;
+                }
+
                 newPos.addAction(vChildSig);
                 newPos.addExpansion(aSig, vChildSig);
             } else {
@@ -1278,51 +1313,50 @@ void Planner::propagateActionsWithUniqueID(size_t offset) {
             // action expands to "blank" at non-zero offsets
             USignature& blankSig = _htn.getBlankActionSig();
 
-            if (aSig._unique_id == 203 || aSig._unique_id == 436) {
-                int a = 0;
-            }
-
             // Get the number of blank action already in the position
-            int numBlankActions = 0;
-            for (const auto& aSig: newPos.getActionsWithUniqueID()) {
-                if (aSig._name_id == 1) {
-                    numBlankActions++;
-                }
-            }
+            // int numBlankActions = 0;
+            // for (const auto& aSig: newPos.getActionsWithUniqueID()) {
+            //     if (aSig._name_id == 1) {
+            //         numBlankActions++;
+            //     }
+            // }
 
-            if (numBlankActions > 0) {
+            // if (numBlankActions > 0) {
                 
-                for (const auto& aSig: newPos.getActionsWithUniqueID()) {
-                    if (aSig.repetition > 0) {
-                        int a = 0;
-                    }
-                }
-            }
-            // Create a copy of the blank action
-            USignature blankSigWithRepetition = USignature(blankSig._name_id, blankSig._args);
+            //     for (const auto& aSig: newPos.getActionsWithUniqueID()) {
+            //         if (aSig.repetition > 0) {
+            //             int a = 0;
+            //         }
+            //     }
+            // }
+            // // Create a copy of the blank action
+            // USignature blankSigWithRepetition = USignature(blankSig._name_id, blankSig._args);
 
-            blankSigWithRepetition.setNextId();
+            blankSig.setNextId();
+
+            // if (blankSig._unique_id == 366) {
+            //     int a = 0;
+            //     // Display the hash of this action
+            //     USignatureHasherWithUniqueID hasher;
+            //     std::size_t h = hasher(blankSig);
+            //     Log::i("hash %i\n", h);
+            //     // Display all the hash already in the position
+            //     for (const auto& aSig: newPos.getActionsWithUniqueID()) {
+            //         std::size_t h = hasher(aSig);
+            //         Log::i("hash %i\n", h);
+            //     }
+            // }
             // Set the number of repetition 
             // blankSigWithRepetition.setRepetition(numBlankActions);
-            newPos.addAction(blankSigWithRepetition);
-            newPos.addExpansion(aSig, blankSigWithRepetition);
+            newPos.addAction(blankSig);
+            newPos.addExpansion(aSig, blankSig);
 
-            if (numBlankActions > 0) {
-
-                // Test is there is an action with a repetition
-                for (const auto& aSig: newPos.getActionsWithUniqueID()) {
-                    if (aSig.repetition > 0) {
-                        int a = 0;
-                    }
-                }
-
-                int theend;
-            }
-
-            
-
-            
-
+            // if (numBlankActions > 0) {
+            // if (blankSig._unique_id == 366) {
+            //     for (auto& aSig: newPos.getActionsWithUniqueID()) {
+            //         Log::i("id %i\n", aSig._unique_id);
+            //     }
+            // }
             // newPos.addAction(blankSig);
             // newPos.addExpansion(aSig, blankSig);
         }

@@ -39,6 +39,10 @@ public:
     const Reduction& getReduction(const USignature& sig) const {
         return _reductions_by_sig.at(sig);
     }
+
+    const NodeHashMap<USignature, Action, USignatureHasher>& getActions() const {
+        return _actions_by_sig;
+    }
 };
 
 #endif
