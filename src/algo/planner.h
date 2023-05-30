@@ -118,7 +118,7 @@ private:
     void printStatistics();
 
 
-    bool constructPrimitiveTree(Layer& layer, int layerIdx);
+    bool constructPrimitiveTree(Layer& layer, int layerIdx, std::vector<PositionedUSig>& intialActionsInPrimitiveTree);
     void computePreviousesAndNextsFlows(Layer& layer, int layerIdx);
     bool recursiveComputePrimitiveTree(USignature currentAction, Layer& layer, int posIdx, robin_hood::unordered_set<int>& actionsAlreadyVisited, robin_hood::unordered_set<int>& idActionsInPrimitiveTree);
 

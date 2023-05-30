@@ -52,7 +52,8 @@ private:
     const bool _implicit_primitiveness;
 
     bool USE_LIFTED_TREE_PATH;
-    robin_hood::unordered_flat_set<std::vector<int>> _q_consts_at_most_one_already_added;
+    std::set<std::vector<int>> _q_consts_at_most_one_already_added;
+    FlatHashMap<int, SigSet> id_action_to_parent_method_preconditions;
 
     const bool _useSMTSolver;
 
@@ -85,7 +86,8 @@ public:
     // For lifted tree path
     // void encode_for_lifted_tree_path(size_t layerIdx, size_t pos);
     void encode_for_lifted_tree_path(size_t layerIdx, size_t pos);
-    void encode_for_lifted_tree_path_ensure_one_init_action_is_true(size_t layerIdx);
+    // void encode_for_lifted_tree_path_ensure_one_init_action_is_true(size_t layerIdx);
+    void encode_for_lifted_tree_path_ensure_one_init_action_is_true(std::vector<PositionedUSig>& initActions);
     void __interfaceSolver__reset();
     // ENd for lifted tree path
 

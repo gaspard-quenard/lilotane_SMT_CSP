@@ -38,6 +38,8 @@ struct USignature {
     bool is_primitive = false;
     int max_step_from_root = -1;
     int last_parent_method_id = -1;
+    bool shadow_action = false;
+    bool first_child_of_reduction = false;
 
     USignature();
     USignature(int nameId, const std::vector<int>& args);
@@ -64,6 +66,14 @@ struct USignature {
 
     inline void setRepetition(int rep) {
         repetition = rep;
+    }
+
+    inline void setShadowAction(bool shadowAction) {
+        shadow_action = shadowAction;
+    }
+
+    inline void setFirstChildOfReduction(bool firstChildOfReduction) {
+        first_child_of_reduction = firstChildOfReduction;
     }
 
     inline void setMaxStepFromRoot(int maxStepFromRoot) {
@@ -152,6 +162,7 @@ struct USignatureHasherWithUniqueID {
         }
         hash_combine(hash, s._name_id);
         // hash_combine(hash, s.repetition);
+        hash_combine(hash, s.first_child_of_reduction);
         hash_combine(hash, s._unique_id);
         return hash;
     }
@@ -188,7 +199,8 @@ struct USignatureEqualityWithUniqueID {
     bool operator()(const USignature& lhs, const USignature& rhs) const {
         return (lhs._args == rhs._args) &&
                (lhs._name_id == rhs._name_id) &&
-               (lhs._unique_id == rhs._unique_id);
+               (lhs._unique_id == rhs._unique_id) &&
+               (lhs.first_child_of_reduction == rhs.first_child_of_reduction);
     }
 };
 

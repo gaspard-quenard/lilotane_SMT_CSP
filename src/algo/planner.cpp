@@ -291,8 +291,9 @@ bool Planner::createNextLayer() {
         computePreviousesAndNextsFlows(newLayer, _layer_idx);
 
         // Compute the time of the following function
+        std::vector<PositionedUSig> intialActionsInPrimitiveTree;
         auto start = std::chrono::high_resolution_clock::now();
-        bool primitiveTreeIsNotEmpty = constructPrimitiveTree(newLayer, _layer_idx);
+        bool primitiveTreeIsNotEmpty = constructPrimitiveTree(newLayer, _layer_idx, intialActionsInPrimitiveTree);
         auto stop = std::chrono::high_resolution_clock::now();
         auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
         long long int time_ms = duration.count();
@@ -318,8 +319,8 @@ bool Planner::createNextLayer() {
             }
         }
 
-        _enc.encode_for_lifted_tree_path_ensure_one_init_action_is_true(_layer_idx);
-
+        // _enc.encode_for_lifted_tree_path_ensure_one_init_action_is_true(_layer_idx);
+        _enc.encode_for_lifted_tree_path_ensure_one_init_action_is_true(intialActionsInPrimitiveTree);
         // _enc.__interfaceSolver__printFormula();        
 
         newLayer.consolidate();
@@ -628,9 +629,9 @@ void Planner::computePreviousesAndNextsFlows(Layer& layer, int layerIdx) {
 }
 
 /**
- * Return true if the primitive tree is not empty
+ * Return all the initial action of the primitive tree if the primitive tree is not empty
 */
-bool Planner::constructPrimitiveTree(Layer& layer, int layerIdx) {
+bool Planner::constructPrimitiveTree(Layer& layer, int layerIdx, std::vector<PositionedUSig>& initialActionsInPrimitiveTree) {
 
     robin_hood::unordered_set<int> flowsAlreadySeen;
     robin_hood::unordered_set<int> idActionsInPrimitiveTree;
@@ -650,6 +651,12 @@ bool Planner::constructPrimitiveTree(Layer& layer, int layerIdx) {
                 Log::d("Action: %s (can be the beginning of the primitive tree)\n", aSigName.c_str());
 
                 recursiveComputePrimitiveTree(aSig, layer, posIdx, flowsAlreadySeen, idActionsInPrimitiveTree);
+
+                if (newPos.getActionsInPrimitiveTree().contains(aSig)) {
+                    // Create a copy
+                    // const USignature aSigCopy = aSig;
+                    initialActionsInPrimitiveTree.push_back(PositionedUSig(layerIdx, posIdx, aSig));
+                }
             }
         }
     }
@@ -683,7 +690,7 @@ bool Planner::constructPrimitiveTree(Layer& layer, int layerIdx) {
         Log::i("The primitive tree is empty\n");
     }
 
-    debug_write_all_paths_in_file(layer, layerIdx);
+    // debug_write_all_paths_in_file(layer, layerIdx);
 
 
     return !primitiveTreeIsEmpty;
@@ -1179,9 +1186,9 @@ void Planner::propagateActions(size_t offset) {
     for (auto& aSig : above.getActions()) {
         if (offset < 1) {
 
-            if (aSig._unique_id == 130 || aSig._unique_id == 128) {
-                int a = 0;
-            }
+            // if (aSig._unique_id == 130 || aSig._unique_id == 128) {
+            //     int a = 0;
+            // }
             // proper action propagation
             assert(_htn.isFullyGround(aSig));
             if (_params.isNonzero("aar") && !_htn.isActionRepetition(aSig._name_id)) {
@@ -1202,53 +1209,9 @@ void Planner::propagateActions(size_t offset) {
             // action expands to "blank" at non-zero offsets
             USignature& blankSig = _htn.getBlankActionSig();
 
-            if (aSig._unique_id == 203 || aSig._unique_id == 436) {
-                int a = 0;
-            }
-
-            // Get the number of blank action already in the position
-            int numBlankActions = 0;
-            for (const auto& aSig: newPos.getActions()) {
-                if (aSig._name_id == 1) {
-                    numBlankActions++;
-                }
-            }
-
-            if (numBlankActions > 0) {
-                
-                for (const auto& aSig: newPos.getActions()) {
-                    if (aSig.repetition > 0) {
-                        int a = 0;
-                    }
-                }
-            }
-            // Create a copy of the blank action
-            USignature blankSigWithRepetition = USignature(blankSig._name_id, blankSig._args);
-
-            blankSigWithRepetition.setNextId();
-            // Set the number of repetition 
-            // blankSigWithRepetition.setRepetition(numBlankActions);
-            newPos.addAction(blankSigWithRepetition);
-            newPos.addExpansion(aSig, blankSigWithRepetition);
-
-            if (numBlankActions > 0) {
-
-                // Test is there is an action with a repetition
-                for (const auto& aSig: newPos.getActions()) {
-                    if (aSig.repetition > 0) {
-                        int a = 0;
-                    }
-                }
-
-                int theend;
-            }
-
-            
-
-            
-
-            // newPos.addAction(blankSig);
-            // newPos.addExpansion(aSig, blankSig);
+            blankSig.setNextId();
+            newPos.addAction(blankSig);
+            newPos.addExpansion(aSig, blankSig);
         }
     }
 }
@@ -1313,52 +1276,12 @@ void Planner::propagateActionsWithUniqueID(size_t offset) {
             // action expands to "blank" at non-zero offsets
             USignature& blankSig = _htn.getBlankActionSig();
 
-            // Get the number of blank action already in the position
-            // int numBlankActions = 0;
-            // for (const auto& aSig: newPos.getActionsWithUniqueID()) {
-            //     if (aSig._name_id == 1) {
-            //         numBlankActions++;
-            //     }
-            // }
-
-            // if (numBlankActions > 0) {
-                
-            //     for (const auto& aSig: newPos.getActionsWithUniqueID()) {
-            //         if (aSig.repetition > 0) {
-            //             int a = 0;
-            //         }
-            //     }
-            // }
-            // // Create a copy of the blank action
-            // USignature blankSigWithRepetition = USignature(blankSig._name_id, blankSig._args);
-
             blankSig.setNextId();
+            blankSig.setShadowAction(true);
 
-            // if (blankSig._unique_id == 366) {
-            //     int a = 0;
-            //     // Display the hash of this action
-            //     USignatureHasherWithUniqueID hasher;
-            //     std::size_t h = hasher(blankSig);
-            //     Log::i("hash %i\n", h);
-            //     // Display all the hash already in the position
-            //     for (const auto& aSig: newPos.getActionsWithUniqueID()) {
-            //         std::size_t h = hasher(aSig);
-            //         Log::i("hash %i\n", h);
-            //     }
-            // }
-            // Set the number of repetition 
-            // blankSigWithRepetition.setRepetition(numBlankActions);
             newPos.addAction(blankSig);
             newPos.addExpansion(aSig, blankSig);
 
-            // if (numBlankActions > 0) {
-            // if (blankSig._unique_id == 366) {
-            //     for (auto& aSig: newPos.getActionsWithUniqueID()) {
-            //         Log::i("id %i\n", aSig._unique_id);
-            //     }
-            // }
-            // newPos.addAction(blankSig);
-            // newPos.addExpansion(aSig, blankSig);
         }
     }
 }
@@ -1386,6 +1309,11 @@ void Planner::propagateReductions(size_t offset) {
             USignature& blankSig = _htn.getBlankActionSig();
 
             blankSig.setNextId();
+            if (offset > 0) {
+                blankSig.setShadowAction(true);
+            } else {
+                blankSig.setFirstChildOfReduction(true);
+            }
 
             // Get the number of blank actions already in the position
             // int numBlankActions = 0;
@@ -1423,6 +1351,9 @@ void Planner::propagateReductions(size_t offset) {
 
             // TEST
             subRSig.setNextId();
+            if (offset == 0) {
+                subRSig.setFirstChildOfReduction(true);
+            }
             // END TEST
 
             const Reduction& subR = _htn.getOpTable().getReduction(subRSig);
@@ -1436,6 +1367,17 @@ void Planner::propagateReductions(size_t offset) {
                 reductionsWithChildren.insert(rSig);
                 newPos.addExpansion(rSig, subRSig);
 
+
+                // if (rSig._unique_id == 1) {
+                //     int dbg = 0;
+                //     // Display the parent to check something
+                //     for (USignature aSig : newPos.getPredecessorsWithUniqueID().at(subRSig._unique_id)) {
+                //         if (aSig._unique_id == 1) {
+                //             Log::i("Parent: %s\n", Names::to_SMT_string(aSig, true).c_str());
+                //         }
+                //     }
+                // }
+
                 if (USE_LIFTED_TREE_PATH) {
                     // Needs to inherit the domain from the parent
                     _htn.inheritQConstFromParent(subRSig, rSig);
@@ -1448,6 +1390,9 @@ void Planner::propagateReductions(size_t offset) {
 
             // TEST
             aSig.setNextId();
+            if (offset == 0) {
+                aSig.setFirstChildOfReduction(true);
+            }
             // END TEST
 
             assert(_htn.isFullyGround(aSig));
