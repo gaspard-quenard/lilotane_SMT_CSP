@@ -52,6 +52,7 @@ private:
     const bool _implicit_primitiveness;
 
     bool USE_LIFTED_TREE_PATH;
+    bool remove_shadow_actions;
     std::set<std::vector<int>> _q_consts_at_most_one_already_added;
     FlatHashMap<int, SigSet> id_action_to_parent_method_preconditions;
 
@@ -69,6 +70,7 @@ public:
             _termination_callback(terminationCallback),
             _use_q_constant_mutexes(_params.getIntParam("qcm") > 0), 
             USE_LIFTED_TREE_PATH(_params.isNonzero("useLiftedTreePathEncoder")),
+            remove_shadow_actions(_params.isNonzero("useLiftedTreePathEncoder") && _params.isNonzero("removeShadowActions")),
             _implicit_primitiveness(params.isNonzero("ip")) {}
 
     void encode(size_t layerIdx, size_t pos);

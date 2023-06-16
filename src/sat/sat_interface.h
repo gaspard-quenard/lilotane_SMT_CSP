@@ -29,6 +29,7 @@ private:
 
     const bool _print_formula;    
     bool _began_line = false;
+    const std::string _formula_file;
 
     const bool _is_used;
 
@@ -41,7 +42,7 @@ private:
 
 public:
     SatInterface(bool is_used, Parameters& params, EncodingStatistics& stats) : 
-                _is_used(is_used), _params(params), _stats(stats), _print_formula(params.isNonzero("wf")), _seed(params.getIntParam("s")) {
+                _is_used(is_used), _params(params), _stats(stats), _print_formula(_params.getParam("wf") != ""), _seed(params.getIntParam("s")), _formula_file(params.getParam("wf")) {
 
         _solver = ipasir_init();
 
@@ -50,7 +51,7 @@ public:
             return;
         }
         ipasir_set_seed(_solver, params.getIntParam("s"));
-        if (true) _out.open("formula.cnf");
+        if (_print_formula) _out.open(_formula_file);
     }
     
     inline void addClause(int lit) {
@@ -164,6 +165,11 @@ public:
         ipasir_release(_solver);
 
         _solver = ipasir_init();
+        if (_print_formula) {
+            // Clear the _out file
+            _out.close();
+            _out.open(_formula_file, std::ofstream::out | std::ofstream::trunc);
+        } 
         ipasir_set_seed(_solver, _seed);
     }
 
@@ -223,7 +229,8 @@ public:
 
             // Append main content to formula file (reading from "old" file)
             std::ifstream oldfile;
-            oldfile.open("formula.cnf");
+            // oldfile.open("formula.cnf");
+            oldfile.open(_formula_file);
             std::string line;
             while (std::getline(oldfile, line)) {
                 line = line + "\n";

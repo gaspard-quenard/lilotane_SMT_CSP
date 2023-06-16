@@ -21,6 +21,7 @@ public:
     RetroactivePruning(std::vector<Layer*>& layers, Encoding& enc) : _layers(layers), _enc(enc) {}
 
     void prune(const USignature& op, int layerIdx, int pos);
+    void pruneLiftedTreePath(const USignature& op, int layerIdx, int pos);
 
     size_t getNumRetroactivePunings() const {return _num_retroactive_prunings;}
     size_t getNumRetroactivelyPrunedOps() const {return _num_retroactively_pruned_ops;}

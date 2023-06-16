@@ -88,7 +88,7 @@ struct USignature {
     inline bool operator==(const USignature& b) const {
         if (_name_id != b._name_id) return false;
         // if (_unique_id != b._unique_id) return false;
-        if (repetition != b.repetition) return false;
+        // if (repetition != b.repetition) return false;
         if (_args != b._args) return false;
         return true;
     }
@@ -179,6 +179,15 @@ struct SignatureHasher {
 };
 struct PositionedUSigHasher {
     USignatureHasher usigHasher;
+    std::size_t operator()(const PositionedUSig& x) const {
+        size_t hash = x.layer;
+        hash_combine(hash, x.pos);
+        hash_combine(hash, usigHasher(x.usig));
+        return hash;
+    }
+};
+struct PositionedUSigHasherWithUniqueID {
+    USignatureHasherWithUniqueID usigHasher;
     std::size_t operator()(const PositionedUSig& x) const {
         size_t hash = x.layer;
         hash_combine(hash, x.pos);

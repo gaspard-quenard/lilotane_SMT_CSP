@@ -104,6 +104,7 @@ void Position::addAction(USignature&& action) {
 }
 void Position::addReduction(const USignature& reduction) {
     _reductions.insert(reduction);
+    _reductionsWithUniqueID.insert(reduction);
     Log::d("+REDUCTION@(%i,%i) %s\n", _layer_idx, _pos, TOSTR(reduction));
 }
 void Position::addExpansion(const USignature& parent, const USignature& child) {
@@ -119,31 +120,39 @@ void Position::addExpansion(const USignature& parent, const USignature& child) {
     //     // }
     // }
 
+    // if (parent._unique_id == 29) {
+    //     int dbg = 0;
+    // }
+
+    if (child._unique_id == 19) {
+        int dbg = 0;
+    }
+
     auto& set = _expansions[parent];
     set.insert(child);
     auto& pred = _predecessors[child];
     pred.insert(parent);
 
     auto& predUniqueId = _predecessors_with_unique_id[child._unique_id];
-    if (predUniqueId.size() > 0) {
-        Log::i("Size superior for %s (%i)\n", Names::to_SMT_string(child).c_str(), child._unique_id);
-        Log::i("All predecessors:\n");
-        for (const auto& p : predUniqueId) {
-            Log::i("    %s (%i)\n", Names::to_SMT_string(p).c_str(), p._unique_id);
-            // Write all of its children
-            auto& children = _expansions[p];
-            Log::i("        Children:\n");
-            for (const auto& c : children) {
-                Log::i("            %s (%i)\n", Names::to_SMT_string(c).c_str(), c._unique_id);
-            }
-        }
-        Log::i("    %s (%i)\n", Names::to_SMT_string(parent).c_str(), parent._unique_id);
-        Log::i("        Children:\n");
-        for (const auto& c : set) {
-            Log::i("            %s (%i)\n", Names::to_SMT_string(c).c_str(), c._unique_id);
-        }
-        int dbg = 0;
-    }
+    // if (predUniqueId.size() > 0) {
+    //     Log::i("Size superior for %s (%i)\n", Names::to_SMT_string(child).c_str(), child._unique_id);
+    //     Log::i("All predecessors:\n");
+    //     for (const auto& p : predUniqueId) {
+    //         Log::i("    %s (%i)\n", Names::to_SMT_string(p).c_str(), p._unique_id);
+    //         // Write all of its children
+    //         auto& children = _expansions[p];
+    //         Log::i("        Children:\n");
+    //         for (const auto& c : children) {
+    //             Log::i("            %s (%i)\n", Names::to_SMT_string(c).c_str(), c._unique_id);
+    //         }
+    //     }
+    //     Log::i("    %s (%i)\n", Names::to_SMT_string(parent).c_str(), parent._unique_id);
+    //     Log::i("        Children:\n");
+    //     for (const auto& c : set) {
+    //         Log::i("            %s (%i)\n", Names::to_SMT_string(c).c_str(), c._unique_id);
+    //     }
+    //     int dbg = 0;
+    // }
     predUniqueId.insert(parent);
 
     // if (child._unique_id == 364) {
@@ -162,9 +171,6 @@ void Position::addExpansion(const USignature& parent, const USignature& child) {
 
 // TEST  ================================================
 void Position::addPrevious(const USignature& current, const USignature& previous) {
-    if (previous._unique_id == 130) {
-        int dbg = 0;
-    }
     auto& set = _previous[current._unique_id];
     set.insert(previous);
 }
@@ -216,14 +222,28 @@ void Position::removeActionOccurrence(const USignature& action) {
     _actionsWithUniqueID.erase(action);
     for (auto& [parent, children] : _expansions) {
         children.erase(action);
+        if (children.size() == 0) {
+            _expansions.erase(parent);
+        }
     }
+    _predecessors_with_unique_id.erase(action._unique_id);
     _predecessors.erase(action);
 }
 void Position::removeReductionOccurrence(const USignature& reduction) {
     _reductions.erase(reduction);
+    _reductionsWithUniqueID.erase(reduction);
     for (auto& [parent, children] : _expansions) {
+        if (parent._unique_id == 29) {
+            int dbg = 0;
+        }
         children.erase(reduction);
+        if (children.size() == 0) {
+            // We must delete the parent as well since it does not have any children
+            int dbg = 0;
+            _expansions.erase(parent);
+        }
     }
+    _predecessors_with_unique_id.erase(reduction._unique_id);
     _predecessors.erase(reduction);
 }
 void Position::replaceOperation(const USignature& from, const USignature& to, Substitution&& s) {
@@ -261,7 +281,9 @@ void Position::moveVariableTable(VarType type, Position& destination) {
 
 bool Position::hasQFact(const USignature& fact) const {return _qfacts.count(fact);}
 bool Position::hasAction(const USignature& action) const {return _actions.count(action);}
+bool Position::hasActionWithUniqueID(const USignature& action) const {return _actionsWithUniqueID.count(action);}
 bool Position::hasReduction(const USignature& red) const {return _reductions.count(red);}
+bool Position::hasReductionWithUniqueID(const USignature& red) const {return _reductionsWithUniqueID.count(red);}
 
 size_t Position::getLayerIndex() const {return _layer_idx;}
 size_t Position::getPositionIndex() const {return _pos;}
@@ -292,6 +314,7 @@ const NodeHashMap<USignature, std::vector<TypeConstraint>, USignatureHasher>& Po
 
 USigSet& Position::getActions() {return _actions;}
 USigSetUniqueID& Position::getActionsWithUniqueID() {return _actionsWithUniqueID;}
+USigSetUniqueID& Position::getReductionsWithUniqueID() {return _reductionsWithUniqueID;}
 USigSet& Position::getReductions() {return _reductions;}
 NodeHashMap<USignature, USigSetUniqueID, USignatureHasherWithUniqueID, USignatureEqualityWithUniqueID>& Position::getExpansions() {return _expansions;}
 NodeHashMap<USignature, USigSet, USignatureHasher>& Position::getPredecessors() {return _predecessors;}

@@ -65,6 +65,7 @@ private:
     int num_objects;
 
     const bool _print_formula;
+    const std::string _formula_file;
     const bool use_one_var_for_qconst;
     const bool use_enum_sort_for_objects;
 
@@ -116,7 +117,8 @@ public:
             enum_consts(_contextZ3), 
             enum_testers(_contextZ3), 
             sort_all_objects_Z3(_contextZ3),
-            _print_formula(params.isNonzero("wf")),
+            _print_formula(_params.getParam("wf") != ""),
+            _formula_file(params.getParam("wf")),
             use_one_var_for_qconst(params.isNonzero("one_var_qconst")),
             use_enum_sort_for_objects(params.isNonzero("use_enum_sort"))
     {
@@ -1167,7 +1169,7 @@ public:
 
             // Create final formula file
             std::ofstream ffile;
-            ffile.open("test2.SMT");
+            ffile.open(_formula_file);
 
             if (useCVC5)
             {

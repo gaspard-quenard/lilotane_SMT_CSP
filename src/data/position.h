@@ -35,6 +35,7 @@ private:
     USigSet _reductions;
 
     USigSetUniqueID _actionsWithUniqueID;
+    USigSetUniqueID _reductionsWithUniqueID;
 
     NodeHashMap<USignature, USigSetUniqueID, USignatureHasherWithUniqueID, USignatureEqualityWithUniqueID> _expansions;
     NodeHashMap<USignature, USigSet, USignatureHasher> _predecessors; // FOR STRANGE REASON, I CANNOT PUT USignatureHasherWithUniqueID AS HASH HERE ???
@@ -148,7 +149,9 @@ public:
 
     bool hasQFact(const USignature& fact) const;
     bool hasAction(const USignature& action) const;
+    bool hasActionWithUniqueID(const USignature& action) const;
     bool hasReduction(const USignature& red) const;
+    bool hasReductionWithUniqueID(const USignature& red) const;
 
     const USigSet& getQFacts() const;
     int getNumQFacts() const;
@@ -166,6 +169,7 @@ public:
     USigSet& getActions();
     USigSetUniqueID& getActionsWithUniqueID();
     USigSet& getReductions();
+    USigSetUniqueID& getReductionsWithUniqueID();
     NodeHashMap<USignature, USigSetUniqueID, USignatureHasherWithUniqueID, USignatureEqualityWithUniqueID>& getExpansions();
     NodeHashMap<USignature, USigSet, USignatureHasher>& getPredecessors();
     // NodeHashMap<USignature, USigSetUniqueID, USignatureHasherWithUniqueID>& getPredecessorsWithUniqueID();

@@ -101,6 +101,7 @@ std::vector<PlanItem> extractClassicalPlanLiftedTreePath(PlanExtraction mode = P
             Log::log_notime(Log::V4_DEBUG, "\n");
 
             int chosenActions = 0;
+            bool isMethodPrecond = false;
             //State newState = state;
             for (const auto& [sig, aVar] : finalLayer[pos].getVariableTableOPUniqueID()) {
                 if (_useSmt && !_smt.holds(aVar)) continue;
@@ -121,6 +122,14 @@ std::vector<PlanItem> extractClassicalPlanLiftedTreePath(PlanExtraction mode = P
                 
                 Log::d("PLANDBG %i,%i A %s\n", li, pos, TOSTR(aSig));
 
+                isMethodPrecond = false;
+                // If this is a method precondition (start with <method_prec>), then do not add it to the plan
+                std::string name = TOSTR(aSig);
+                // Carefull, must be find that <method_prec> is at the start of the string
+                if (name.find("(<method_prec>") == 0) {
+                    isMethodPrecond = true;
+                }
+
                 // aVar = aSig._unique_id;
 
                 int v = aSig._unique_id;
@@ -132,11 +141,12 @@ std::vector<PlanItem> extractClassicalPlanLiftedTreePath(PlanExtraction mode = P
                 if (aDec == Sig::NONE_SIG) continue;
                 plan[pos] = {v, aDec, aDec, std::vector<int>()};
 
-                // Log::i("Sig2: %s\n", TOSTR(sig));
+                // Log::i("Sig2: %s\n", TOSTR(aDec));
             }
 
             assert(chosenActions <= 1 || Log::e("Plan error: Added %i actions at step %i!\n", chosenActions, pos));
-            if (chosenActions == 0) {
+            
+            if (chosenActions == 0 || isMethodPrecond) {
                 plan[pos] = {-1, USignature(), USignature(), std::vector<int>()};
             }
         }
@@ -288,6 +298,20 @@ std::vector<PlanItem> extractClassicalPlanLiftedTreePath(PlanExtraction mode = P
         auto& [classicalPlan, plan] = result;
         classicalPlan = extractClassicalPlanLiftedTreePath();
 
+        // Print the classical plan
+        Log::i("Classical plan:\n");
+        int idx = 0;
+        for (auto& a: classicalPlan) {
+            if (a.reduction._name_id != 1 && a.reduction._name_id != -1) { // Do not print blank action and special precondition action
+                std::string name = TOSTR(a.reduction);
+                // If the name does not contains the substring <method_prec>, then print it
+                if (name.find("<method_prec>") == std::string::npos) {
+                    Log::i(" (%i)-> %s\n", idx, TOSTR(a.reduction));
+                }
+            }
+            idx++;
+        }
+
 
         // Make a first pass to set all the reduction/action which is true in each layer position
         // Create a loopup table which indicate the id already seen
@@ -298,6 +322,10 @@ std::vector<PlanItem> extractClassicalPlanLiftedTreePath(PlanExtraction mode = P
         // Now, iterate over each action of the classical plan, and get its last method parent id, indicate that it is true, and recurse
         for (int i = 0; i < classicalPlan.size(); i++) {
             auto& aSig = classicalPlan[i].reduction;
+
+            if (aSig._name_id == -1) {
+                continue;
+            }
 
             // Get its position objects
             Position& pos = lastLayer[i];
@@ -417,6 +445,11 @@ std::vector<PlanItem> extractClassicalPlanLiftedTreePath(PlanExtraction mode = P
                 // Get the action/reduction true for this layer position
                 const USignature& actionOrReductionTrue = l[pos].getActionOrReductionTrue(); 
 
+                if (actionOrReductionTrue._name_id == -1) {
+                    Log::i("No action or reduction true at this position\n");
+                    continue;
+                }
+
                 // Display the action or reduction true
                 Log::i("  %s\n", TOSTR(actionOrReductionTrue));
 
@@ -473,9 +506,11 @@ std::vector<PlanItem> extractClassicalPlanLiftedTreePath(PlanExtraction mode = P
 
                             int v = rSig._unique_id;
 
-                            //log("%s:%s @ (%i,%i)\n", TOSTR(r.getTaskSignature()), TOSTR(rSig), layerIdx, pos);
+                            Log::i("%s:%s @ (%i,%i)\n", TOSTR(r.getTaskSignature()), TOSTR(rSig), layerIdx, pos);
                             USignature decRSig = getDecodedQOp(layerIdx, pos, rSig);
-                            if (decRSig == Sig::NONE_SIG) continue;
+                            if (decRSig == Sig::NONE_SIG)  {
+                                continue;
+                            }
 
                             Reduction rDecoded = r.substituteRed(Substitution(r.getArguments(), decRSig._args));
                             Log::d("[%i] %s:%s @ (%i,%i)\n", v, TOSTR(rDecoded.getTaskSignature()), TOSTR(decRSig), layerIdx, pos);

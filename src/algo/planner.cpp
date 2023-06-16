@@ -306,7 +306,18 @@ bool Planner::createNextLayer() {
         //     return false;
         // }
 
+        // TEST
+        // Re compute the true and false facts with only the primitive tree (Difficult, since we must recompute the preconditions and effects of all actions of the primitive tree)
+        // propagateInitialState();
+        // for (int posIdx = 0; posIdx < newLayer.size(); posIdx++) {
+        //     Position& pos = newLayer[posIdx];
+        //     initializeNextEffectsPrimitiveTree(pos);
+        // }
+
+        // END TEST
+
         // Encode new layer
+        // Print the current layer
         Log::i("Encoding for lifted tree path ...\n");
         for (_old_pos = 0; _old_pos < oldLayer.size(); _old_pos++) {
             size_t newPos = oldLayer.getSuccessorPos(_old_pos);
@@ -359,7 +370,7 @@ void Planner::computePreviousesAndNextsFlows(Layer& layer, int layerIdx) {
 
     // Iterate over all positions
     for (int posIdx = 0; posIdx < layer.size(); posIdx++) {
-        Log::i("At pos: %i/%i\n", posIdx + 1, layer.size());
+        Log::d("At pos: %i/%i\n", posIdx, layer.size());
         Position& newPos = layer[posIdx]; 
 
         bool hasAbove = layerIdx > 0;
@@ -371,6 +382,18 @@ void Planner::computePreviousesAndNextsFlows(Layer& layer, int layerIdx) {
                 _old_pos++;
         }
         Position& above = (hasAbove ? (*_layers.at(layerIdx-1))[_old_pos] : NULL_POS);
+
+
+            // Print all the expansions
+        // if (newPos.getPositionIndex() == 0 && newPos.getLayerIndex() == 4) {
+        //     for (auto& [rSig, exps] : newPos.getExpansions()) {
+        //         for (USignature aSig : exps) {
+        //             Log::i("Expansion of (%i): (%i)\n", rSig._unique_id, aSig._unique_id);
+        //         }
+        //     }
+
+        //     int ebg = 0;
+        // }
 
         //// TEST
         // Check if there is an action with a repetition somewhere
@@ -467,7 +490,7 @@ void Planner::computePreviousesAndNextsFlows(Layer& layer, int layerIdx) {
 
         for (auto& [parent, children] : newPos.getExpansions()) {
 
-            if (parent._unique_id == 130) {
+            if (parent._unique_id == 29) {
                 int dbg = 0;
             }
 
@@ -475,7 +498,7 @@ void Planner::computePreviousesAndNextsFlows(Layer& layer, int layerIdx) {
             std::string parentName = Names::to_SMT_string(parent, false);
             for (USignature& child : children) {
                 std::string childCurrentName = Names::to_SMT_string(child, false);
-                Log::i("Flow: %s(%i) (parent: %s(%i))\n", childCurrentName.c_str(), child._unique_id, parentName.c_str(), parent._unique_id);
+                Log::d("Flow: %s(%i) (parent: %s(%i))\n", childCurrentName.c_str(), child._unique_id, parentName.c_str(), parent._unique_id);
             }
 
             // Get the id of the parent
@@ -496,7 +519,7 @@ void Planner::computePreviousesAndNextsFlows(Layer& layer, int layerIdx) {
 
                      for (USignature& childCurrent : children) {
 
-                        if (childPrevious._unique_id == 366) {
+                        if (childPrevious._unique_id == 822) {
                             int dbg = 0;
                         }
 
@@ -511,7 +534,7 @@ void Planner::computePreviousesAndNextsFlows(Layer& layer, int layerIdx) {
                         std::string childPreviousName = Names::to_SMT_string(childPrevious, false);
                         std::string childCurrentName = Names::to_SMT_string(childCurrent, false);
 
-                        Log::i("Next of: %s(%i) -> %s(%i)\n", childPreviousName.c_str(), childPrevious._unique_id, childCurrentName.c_str(), childCurrent._unique_id);
+                        Log::d("Next of: %s(%i) -> %s(%i)\n", childPreviousName.c_str(), childPrevious._unique_id, childCurrentName.c_str(), childCurrent._unique_id);
 
                      }
                     
@@ -534,12 +557,12 @@ void Planner::computePreviousesAndNextsFlows(Layer& layer, int layerIdx) {
                         int idPreviousParent = previousParent._unique_id;
 
                         if (!childrenIsPreviousesPosition.count(idPreviousParent)) {
-                            Log::i("NONONONON for %s(%i)\n", Names::to_SMT_string(previousParent, false).c_str(), previousParent._unique_id);
+                            Log::e("NONONONON for %s(%i)\n", Names::to_SMT_string(previousParent, false).c_str(), previousParent._unique_id);
 
                             // Print all the previous of above
                             for (USignature& previous : above.getPrevious().at(parent._unique_id)) {
                                 std::string previousName = Names::to_SMT_string(previous, false);
-                                Log::i("Previous of %s(%i): %s(%i)\n", parentName.c_str(), parent._unique_id, previousName.c_str(), previous._unique_id);
+                                Log::e("Previous of %s(%i): %s(%i)\n", parentName.c_str(), parent._unique_id, previousName.c_str(), previous._unique_id);
                             }
                             int a = 0;
                         }
@@ -551,6 +574,11 @@ void Planner::computePreviousesAndNextsFlows(Layer& layer, int layerIdx) {
                                 // if (childPrevious._unique_id == 366) {
                                 //     int numNexts = lastPos.getNexts().at(childPrevious._unique_id).size();
                                 //     int dbg = 0;
+                                // }
+
+                                // if (childPrevious._unique_id == 29) {
+                                //     int dbg = 0;
+                                //     assert(dbg != 0);
                                 // }
 
                                 // Add the nexts
@@ -566,7 +594,7 @@ void Planner::computePreviousesAndNextsFlows(Layer& layer, int layerIdx) {
                                 std::string childPreviousName = Names::to_SMT_string(childPrevious, false);
                                 std::string childCurrentName = Names::to_SMT_string(childCurrent, false);
 
-                                Log::i("Next of: %s(%i) -> %s(%i)\n", childPreviousName.c_str(), childPrevious._unique_id, childCurrentName.c_str(), childCurrent._unique_id);
+                                Log::d("Next of: %s(%i) -> %s(%i)\n", childPreviousName.c_str(), childPrevious._unique_id, childCurrentName.c_str(), childCurrent._unique_id);
 
                             }
                         }
@@ -581,20 +609,26 @@ void Planner::computePreviousesAndNextsFlows(Layer& layer, int layerIdx) {
         childrenIsPreviousesPosition.clear();
         for (auto& [parent, children] : newPos.getExpansions()) {
 
-            Log::i("Parent: %s(%i)\n", Names::to_SMT_string(parent, false).c_str(), parent._unique_id);
+            Log::d("Parent: %s(%i)\n", Names::to_SMT_string(parent, false).c_str(), parent._unique_id);
 
-            // if (parent._unique_id == 364) {
-            //     int dbg = 0;
-            // }
+            if (parent._unique_id == 360) {
+                int dbg = 0;
+
+                int dbg2 = 0;
+            }
 
             // Get the id of the parent
             // int idParent = above.getVariable(VarType::OP, parent);
             int idParent = parent._unique_id;
 
+            if (children.size() == 0) {
+                int dbg2 = 0;
+            }
+
             // Add the children of the parent to the childrenIsPreviousesPosition
             for (USignature& child : children) {
 
-                Log::i("Child: %s(%i)\n", Names::to_SMT_string(child, false).c_str(), child._unique_id);
+                Log::d("Child: %s(%i)\n", Names::to_SMT_string(child, false).c_str(), child._unique_id);
 
                 if (child.repetition > 0) {
                     int dbs = 0;
@@ -609,7 +643,7 @@ void Planner::computePreviousesAndNextsFlows(Layer& layer, int layerIdx) {
                     // Print all the parents
                     for (USignature& parent : newPos.getPredecessorsWithUniqueID().at(child._unique_id)) {
                         std::string parentName = Names::to_SMT_string(parent, false);
-                        Log::i("=> Parent: %s\n", parentName.c_str());
+                        Log::d("=> Parent: %s(%i)\n", parentName.c_str(), parent._unique_id);
                     }
                     int dbg = 0;
                 }
@@ -623,7 +657,7 @@ void Planner::computePreviousesAndNextsFlows(Layer& layer, int layerIdx) {
             }
         }
 
-        Log::i("\n");
+        Log::d("\n");
     }
     int a = 0;
 }
@@ -645,6 +679,10 @@ bool Planner::constructPrimitiveTree(Layer& layer, int layerIdx, std::vector<Pos
 
             // Check if this action can be the beginning of the primitive tree (no previouses flows)
             if (!newPos.getPrevious().contains(aSig._unique_id)) {
+
+                if (aSig._unique_id == 822) {
+                    int dbg = 0;
+                }
 
                 // Indicate that this action can be the beginning of the primitive tree
                 std::string aSigName = Names::to_SMT_string(aSig, true);
@@ -705,7 +743,7 @@ void Planner::debug_write_all_paths_in_file(Layer& layer, int layerIdx) {
     for (int posIdx = 0; posIdx < layer.size(); posIdx++) {
         Position& newPos = layer[posIdx]; 
         std::string posString = std::to_string(posIdx);
-        for (USignature& rSig : newPos.getReductions()) {
+        for (USignature& rSig : newPos.getReductionsWithUniqueID()) {
             file << Names::to_SMT_string(rSig, false) << "__" << posString << " 0 0" << std::endl;
         }
         for (USignature& aSig : newPos.getActionsWithUniqueID()) {
@@ -729,6 +767,12 @@ void Planner::debug_write_all_paths_in_file(Layer& layer, int layerIdx) {
             // Get the aSig
             USignature aSig;
             for (USignature& aSig2 : newPos.getActionsWithUniqueID()) {
+                if (aSig2._unique_id == aSig_unique_id) {
+                    aSig = aSig2;
+                    break;
+                }
+            }
+            for (USignature& aSig2 : newPos.getReductionsWithUniqueID()) {
                 if (aSig2._unique_id == aSig_unique_id) {
                     aSig = aSig2;
                     break;
@@ -857,11 +901,12 @@ void Planner::createNextPositionFromAbove() {
     //eliminateInvalidParentsAtCurrentState(offset);
     if (USE_LIFTED_TREE_PATH) {
         propagateActionsWithUniqueID(offset);
+        propagateReductionsWithUniqueID(offset);
     } else {
         propagateActions(offset);
+        propagateReductions(offset);
     }
-    
-    propagateReductions(offset);
+
     addPreconditionConstraints();
 }
 
@@ -906,7 +951,12 @@ void Planner::createNextPositionFromLeft(Position& left) {
     }
 
     for (const auto& aSig : actionsToRemove) {
-        _pruning.prune(aSig, _layer_idx, _pos-1);
+        if (USE_LIFTED_TREE_PATH) {
+            _pruning.pruneLiftedTreePath(aSig, _layer_idx, _pos-1);
+        } else {
+            _pruning.prune(aSig, _layer_idx, _pos-1);
+        }
+        
     }
 }
 
@@ -967,7 +1017,7 @@ std::optional<SubstitutionConstraint> Planner::addPrecondition(const USignature&
     const USignature& factAbs = fact.getUnsigned();
 
     if (!_htn.hasQConstants(factAbs)) { 
-        assert(_analysis.isReachable(fact) || Log::e("Precondition %s not reachable!\n", TOSTR(fact)));
+        assert(_analysis.isReachable(fact) || Log::e("Precondition %s not reachable for op %s!\n", TOSTR(fact), TOSTR(op)));
                 
         if (_analysis.isReachable(factAbs, !fact._negated)) {
             // Negated prec. is reachable: not statically resolvable
@@ -1136,7 +1186,7 @@ bool Planner::addEffect(const USignature& opSig, const Signature& fact, EffectMo
 
 void Planner::propagateInitialState() {
     assert(_layer_idx > 0);
-    assert(_pos == 0);
+    // assert(_pos == 0);
 
     Position& newPos = (*_layers[_layer_idx])[0];
     Position& above = (*_layers[_layer_idx-1])[0];
@@ -1221,11 +1271,19 @@ void Planner::propagateActionsWithUniqueID(size_t offset) {
     Position& newPos = (*_layers[_layer_idx])[_pos];
     Position& above = (*_layers[_layer_idx-1])[_old_pos];
 
+    if (above.getLayerIndex() == 7 && above.getPositionIndex() == 42) {
+        int dbg = 0;
+    }
+
     // Check validity of actions at above position
     std::vector<USignature> actionsToPrune;
     size_t numActionsBefore = above.getActionsWithUniqueID().size();
     for (const auto& aSig : above.getActionsWithUniqueID()) {
         const Action& a = _htn.getOpTable().getAction(aSig);
+
+        if (aSig._unique_id == 360) {
+            int dbg = 0;
+        }
 
         // Can the action occur here w.r.t. the current state?
         bool valid = _analysis.hasValidPreconditions(a.getPreconditions())
@@ -1240,7 +1298,7 @@ void Planner::propagateActionsWithUniqueID(size_t offset) {
 
     // Prune invalid actions at above position
     for (const auto& aSig : actionsToPrune) {
-        _pruning.prune(aSig, _layer_idx-1, _old_pos);
+        _pruning.pruneLiftedTreePath(aSig, _layer_idx-1, _old_pos);
     }
     assert(above.getActionsWithUniqueID().size() == numActionsBefore - actionsToPrune.size() 
         || Log::e("%i != %i-%i\n", above.getActionsWithUniqueID().size(), numActionsBefore, actionsToPrune.size()));
@@ -1249,7 +1307,7 @@ void Planner::propagateActionsWithUniqueID(size_t offset) {
     for (auto& aSig : above.getActionsWithUniqueID()) {
         if (offset < 1) {
 
-            if (aSig._unique_id == 130 || aSig._unique_id == 128) {
+            if (aSig._unique_id == 360) {
                 int a = 0;
             }
             // proper action propagation
@@ -1273,6 +1331,10 @@ void Planner::propagateActionsWithUniqueID(size_t offset) {
                 newPos.addExpansion(aSig, aSig);
             }
         } else {
+
+            if (aSig._unique_id == 360) {
+                int a = 0;
+            }
             // action expands to "blank" at non-zero offsets
             USignature& blankSig = _htn.getBlankActionSig();
 
@@ -1290,8 +1352,8 @@ void Planner::propagateReductions(size_t offset) {
     Position& newPos = (*_layers[_layer_idx])[_pos];
     Position& above = (*_layers[_layer_idx-1])[_old_pos];
 
-    NodeHashMap<USignature, USigSet, USignatureHasher> subtaskToParents;
-    NodeHashSet<USignature, USignatureHasher> reductionsWithChildren;
+    NodeHashMap<USignature, USigSetUniqueID, USignatureHasher> subtaskToParents;
+    NodeHashSet<USignature, USignatureHasherWithUniqueID, USignatureEqualityWithUniqueID> reductionsWithChildren;
 
     // Collect all possible subtasks and remember their possible parents
     for (const auto& rSig : above.getReductions()) {
@@ -1364,8 +1426,247 @@ void Planner::propagateReductions(size_t offset) {
             newPos.addExpansionSize(subR.getSubtasks().size());
 
             for (const auto& rSig : parents) {
+
+                if (rSig._unique_id == 29) {
+                    int dbg = 0;
+                }
+
                 reductionsWithChildren.insert(rSig);
                 newPos.addExpansion(rSig, subRSig);
+
+                if (newPos.getPositionIndex() == 0 && newPos.getLayerIndex() == 4) {
+
+                    // Print all the expansions
+                    for (auto& [rSig, exps] : newPos.getExpansions()) {
+                        for (USignature aSig : exps) {
+                            Log::i("Expansion of %s(%i): %s(%i)\n", Names::to_SMT_string(rSig, false).c_str(), rSig._unique_id, Names::to_SMT_string(aSig, false).c_str(), aSig._unique_id);
+                        }
+                    }
+
+                    // if (newPos.getExpansions().count(rSig) == 0) {
+                    //     int a = 0;
+                    // }
+                    // // Print all the expansion of 29
+                    // for (USignature aSig : newPos.getExpansions().at(rSig)) {
+                    //     Log::i("Expansion of 29: %s\n", Names::to_SMT_string(aSig, true).c_str());
+                    // }
+                    int c = 0;
+                }
+
+
+                // if (rSig._unique_id == 1) {
+                //     int dbg = 0;
+                //     // Display the parent to check something
+                //     for (USignature aSig : newPos.getPredecessorsWithUniqueID().at(subRSig._unique_id)) {
+                //         if (aSig._unique_id == 1) {
+                //             Log::i("Parent: %s\n", Names::to_SMT_string(aSig, true).c_str());
+                //         }
+                //     }
+                // }
+
+                // if (USE_LIFTED_TREE_PATH) {
+                //     // Needs to inherit the domain from the parent
+                //     _htn.inheritQConstFromParent(subRSig, rSig);
+                //     if (offset == 0) {
+                //         // Inherit the substitution constrains from the parent
+                //                         // Inherit as well all the substitution constains from the parent reduction
+                //         if (above.getSubstitutionConstraints().count(rSig) > 0) {
+                //             for (SubstitutionConstraint constraint : above.getSubstitutionConstraints().at(rSig)) {
+                //                 newPos.addSubstitutionConstraint(subRSig, std::move(constraint));
+                //             }
+                //         }
+                //     }
+                // }
+            }
+        }
+
+        // Any action(s) fitting the subtask?
+        for (USignature& aSig : allActions) {
+
+            // TEST
+            aSig.setNextId();
+            if (offset == 0) {
+                aSig.setFirstChildOfReduction(true);
+            }
+            // END TEST
+
+            assert(_htn.isFullyGround(aSig));
+            newPos.addAction(aSig);
+
+            if (newPos.getLayerIndex() == 4 && newPos.getPositionIndex() == 17) {
+                Log::i("Flow: %s\n", Names::to_SMT_string(aSig, true).c_str());
+                // ACTION__drive-truck_0-Q_3-12_location%0_4e6d4ef15ccc6897-Q_2-8_location%0_e4354a9774db1231
+                int dbg = 0;
+            }
+
+            for (const auto& rSig : parents) {
+                reductionsWithChildren.insert(rSig);
+                newPos.addExpansion(rSig, aSig);
+
+                if (USE_LIFTED_TREE_PATH) {
+                    // Needs to inherit the domain from the parent
+                    _htn.inheritQConstFromParent(aSig, rSig);
+
+                    // if (above.getSubstitutionConstraints().count(rSig) > 0) {
+                    //     for (SubstitutionConstraint constraint : above.getSubstitutionConstraints().at(rSig)) {
+                    //         newPos.addSubstitutionConstraint(aSig, std::move(constraint));
+                    //     }
+                    // }
+                }
+            }
+
+            // TESTETSTEST Iterate over all actions
+            // for (USignature& aSig : newPos.getActions()) {
+            //     int dbg = 0;
+            // }
+
+            // for (USignature& aSig : allActions) {
+            //     int dbg = 0;
+            // }
+
+            // // Try a test here
+            // for (auto& [parent, children] : newPos.getExpansions()) {
+            //     // Iterate over all childre
+            //     for (USignature& child : children) {
+            //         std::string childCurrentName = Names::to_SMT_string(child, false);
+            //         Log::i("Flow: %s\n", childCurrentName.c_str());
+            //     }
+            // }
+        }
+    }
+
+
+    // Print all the expansions
+    if (newPos.getPositionIndex() == 0 && newPos.getLayerIndex() == 4) {
+        for (auto& [rSig, exps] : newPos.getExpansions()) {
+            for (USignature aSig : exps) {
+                Log::i("Expansion of (%i): (%i)\n", rSig._unique_id, aSig._unique_id);
+            }
+        }
+
+        int ebg = 0;
+    }
+
+    // Check if any reduction has no valid children at all
+    for (const auto& rSig : above.getReductions()) {
+        if (!reductionsWithChildren.count(rSig)) {
+            Log::i("Retroactively prune reduction %s@(%i,%i): no children at offset %i\n", 
+                    TOSTR(rSig), _layer_idx-1, _old_pos, offset);
+            if (USE_LIFTED_TREE_PATH) {
+                _pruning.pruneLiftedTreePath(rSig, _layer_idx-1, _old_pos);
+            } else {
+                _pruning.prune(rSig, _layer_idx-1, _old_pos);
+            }
+        }
+    }
+}
+
+
+void Planner::propagateReductionsWithUniqueID(size_t offset) {
+    Position& newPos = (*_layers[_layer_idx])[_pos];
+    Position& above = (*_layers[_layer_idx-1])[_old_pos];
+
+    NodeHashMap<USignature, USigSetUniqueID, USignatureHasherWithUniqueID, USignatureEqualityWithUniqueID> subtaskToParents;
+    NodeHashSet<USignature, USignatureHasherWithUniqueID, USignatureEqualityWithUniqueID> reductionsWithChildren;
+
+    // Collect all possible subtasks and remember their possible parents
+    for (const auto& rSig : above.getReductionsWithUniqueID()) {
+
+        const Reduction r = _htn.getOpTable().getReduction(rSig);
+        
+        if (offset < r.getSubtasks().size()) {
+            // Proper expansion
+            USignature subtask = r.getSubtasks()[offset];
+            subtask.setNextId();
+            subtaskToParents[subtask].insert(rSig);
+        } else {
+            // Blank
+            reductionsWithChildren.insert(rSig);
+            // const USignature& blankSig = _htn.getBlankActionSig();
+            USignature& blankSig = _htn.getBlankActionSig();
+
+            blankSig.setNextId();
+            if (offset > 0) {
+                blankSig.setShadowAction(true);
+            } else {
+                blankSig.setFirstChildOfReduction(true);
+            }
+
+            // Get the number of blank actions already in the position
+            // int numBlankActions = 0;
+            // for (const auto& aSig: newPos.getActions()) {
+            //     if (aSig._name_id == 1) {
+            //         numBlankActions++;
+            //     }
+            // }
+            // // Create a copy of the blank action
+            // USignature blankSigWithRepetition = USignature(blankSig._name_id, blankSig._args);
+            // // Set the number of repetition 
+            // blankSigWithRepetition.setRepetition(numBlankActions);
+            // newPos.addAction(blankSigWithRepetition);
+            // newPos.addExpansion(rSig, blankSigWithRepetition);
+
+            newPos.addAction(blankSig);
+            newPos.addExpansion(rSig, blankSig);
+        }
+    }
+
+    // Iterate over all possible subtasks
+    for (const auto& [subtask, parents] : subtaskToParents) {
+
+        // Calculate all possible actions fitting the subtask.
+        auto allActions = instantiateAllActionsOfTask(subtask);
+
+        // Any reduction(s) fitting the subtask?
+        for (USignature& subRSig : instantiateAllReductionsOfTask(subtask)) {
+
+            if (_htn.isAction(subRSig)) {
+                // Actually an action, not a reduction: remember for later
+                allActions.push_back(subRSig);
+                continue;
+            }
+
+            // TEST
+            subRSig.setNextId();
+            if (offset == 0) {
+                subRSig.setFirstChildOfReduction(true);
+            }
+            // END TEST
+
+            const Reduction& subR = _htn.getOpTable().getReduction(subRSig);
+            
+            assert(_htn.isReduction(subRSig) && subRSig == subR.getSignature() && _htn.isFullyGround(subRSig));
+            
+            newPos.addReduction(subRSig);
+            newPos.addExpansionSize(subR.getSubtasks().size());
+
+            for (const auto& rSig : parents) {
+
+                if (rSig._unique_id == 29) {
+                    int dbg = 0;
+                }
+
+                reductionsWithChildren.insert(rSig);
+                newPos.addExpansion(rSig, subRSig);
+
+                if (newPos.getPositionIndex() == 0 && newPos.getLayerIndex() == 4) {
+
+                    // Print all the expansions
+                    for (auto& [rSig, exps] : newPos.getExpansions()) {
+                        for (USignature aSig : exps) {
+                            Log::i("Expansion of %s(%i): %s(%i)\n", Names::to_SMT_string(rSig, false).c_str(), rSig._unique_id, Names::to_SMT_string(aSig, false).c_str(), aSig._unique_id);
+                        }
+                    }
+
+                    // if (newPos.getExpansions().count(rSig) == 0) {
+                    //     int a = 0;
+                    // }
+                    // // Print all the expansion of 29
+                    // for (USignature aSig : newPos.getExpansions().at(rSig)) {
+                    //     Log::i("Expansion of 29: %s\n", Names::to_SMT_string(aSig, true).c_str());
+                    // }
+                    int c = 0;
+                }
 
 
                 // if (rSig._unique_id == 1) {
@@ -1381,6 +1682,15 @@ void Planner::propagateReductions(size_t offset) {
                 if (USE_LIFTED_TREE_PATH) {
                     // Needs to inherit the domain from the parent
                     _htn.inheritQConstFromParent(subRSig, rSig);
+                    // if (offset == 0) {
+                    //     // Inherit the substitution constrains from the parent
+                    //                     // Inherit as well all the substitution constains from the parent reduction
+                    //     if (above.getSubstitutionConstraints().count(rSig) > 0) {
+                    //         for (SubstitutionConstraint constraint : above.getSubstitutionConstraints().at(rSig)) {
+                    //             newPos.addSubstitutionConstraint(subRSig, std::move(constraint));
+                    //         }
+                    //     }
+                    // }
                 }
             }
         }
@@ -1411,6 +1721,12 @@ void Planner::propagateReductions(size_t offset) {
                 if (USE_LIFTED_TREE_PATH) {
                     // Needs to inherit the domain from the parent
                     _htn.inheritQConstFromParent(aSig, rSig);
+
+                    // if (above.getSubstitutionConstraints().count(rSig) > 0) {
+                    //     for (SubstitutionConstraint constraint : above.getSubstitutionConstraints().at(rSig)) {
+                    //         newPos.addSubstitutionConstraint(aSig, std::move(constraint));
+                    //     }
+                    // }
                 }
             }
 
@@ -1434,12 +1750,28 @@ void Planner::propagateReductions(size_t offset) {
         }
     }
 
+
+    // Print all the expansions
+    if (newPos.getPositionIndex() == 0 && newPos.getLayerIndex() == 4) {
+        for (auto& [rSig, exps] : newPos.getExpansions()) {
+            for (USignature aSig : exps) {
+                Log::i("Expansion of (%i): (%i)\n", rSig._unique_id, aSig._unique_id);
+            }
+        }
+
+        int ebg = 0;
+    }
+
     // Check if any reduction has no valid children at all
-    for (const auto& rSig : above.getReductions()) {
+    for (const auto& rSig : above.getReductionsWithUniqueID()) {
         if (!reductionsWithChildren.count(rSig)) {
             Log::i("Retroactively prune reduction %s@(%i,%i): no children at offset %i\n", 
                     TOSTR(rSig), _layer_idx-1, _old_pos, offset);
-            _pruning.prune(rSig, _layer_idx-1, _old_pos);
+            if (USE_LIFTED_TREE_PATH) {
+                _pruning.pruneLiftedTreePath(rSig, _layer_idx-1, _old_pos);
+            } else {
+                _pruning.prune(rSig, _layer_idx-1, _old_pos);
+            }
         }
     }
 }
@@ -1568,6 +1900,35 @@ void Planner::initializeNextEffects() {
             }
         }
         isAction = false;
+    }
+}
+
+void Planner::initializeNextEffectsPrimitiveTree(Position& newPos) {
+    
+    // For each possible operation effect:
+    for (const auto& aSig : newPos.getActionsInPrimitiveTree()) {
+        std::cout << "METHOD or ACTION: " << Names::to_string(aSig) << std::endl;
+        // std::cout << "Possible facts changed: " << std::endl;
+        const SigSet& pfc = _analysis.getPossibleFactChanges(aSig, FactAnalysis::FULL, FactAnalysis::ACTION);
+        int i = 0;
+        for (const Signature& eff : pfc) {
+
+            if (!_htn.hasQConstants(eff._usig)) {
+                // New ground fact: set before the action may happen
+
+                std::cout << "(" << i << ") " << Names::to_string(eff) << std::endl;
+                i++;
+                initializeFact(newPos, eff._usig); 
+            } else {
+                std::vector<int> sorts = _htn.getOpSortsForCondition(eff._usig, aSig);
+                for (const USignature& decEff : _htn.decodeObjects(eff._usig, _htn.getEligibleArgs(eff._usig, sorts))) {           
+                    // New ground fact: set before the action may happen
+                    // std::cout << "(" << i << ") " << Names::to_string(decEff) << std::endl;
+                    i++;
+                    initializeFact(newPos, decEff);
+                }
+            }
+        }
     }
 }
 

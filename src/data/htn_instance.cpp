@@ -31,14 +31,86 @@ HtnInstance::HtnInstance(Parameters& params) :
     _blank_action_sig = BLANK_ACTION.getSignature();
     _signature_sorts_table[blankId];
 
+
+    // if (params.isNonzero("useLiftedTreePathEncoder")) {
+    //     for (const method& m : methods) {
+
+    //         int id = nameId(m.name);
+    //         // Iterate over all its tasks
+    //         for (const plan_step& st : m.ps) {
+        
+    //             // Normalize task name
+    //             std::string subtaskName = st.task;
+    //             Regex::extractCoreNameOfSplittingMethod(subtaskName);
+    //             Log::d("%s\n", subtaskName.c_str());
+
+    //             if (subtaskName.rfind(method_precondition_action_name) != std::string::npos) {
+    //                 // This "subtask" is a method precondition which was compiled out
+                    
+    //                 // Find primitive task belonging to this method precondition
+    //                 task precTask;
+    //                 size_t maxSize = 0;
+    //                 int numFound = 0;
+    //                 for (task& t : primitive_tasks) {
+                        
+    //                     // Normalize task name
+    //                     std::string taskName = t.name;
+    //                     Regex::extractCoreNameOfSplittingMethod(taskName);
+
+    //                     //Log::d(" ~~~ %s\n", taskName.c_str());
+    //                     if (subtaskName.rfind(taskName) != std::string::npos) {
+
+    //                         size_t size = t.name.size();
+    //                         if (size < maxSize) continue;
+    //                         maxSize = size;
+
+    //                         numFound++;
+
+    //                         if (!(t.vars.size() == m.vars.size())) {
+    //                             // Copy all the arguments of the method into the method precondition task (we want this action to have the same signature as the method)
+    //                             for (const auto& varPair : m.vars) {
+    //                                 // Add it if it is not already there
+    //                                 bool found = false;
+    //                                 for (const auto& varPair2 : t.vars) {
+    //                                     if (varPair.first == varPair2.first) {
+    //                                         found = true;
+    //                                         break;
+    //                                     }
+    //                                 }
+    //                                 if (!found) {
+    //                                     Log::i("Update parameters of method precondition task %s\n", t.name.c_str());
+    //                                     t.vars.push_back(varPair);
+    //                                     t.number_of_original_vars++;
+    //                                     // int taskId = nameId(t.name);
+    //                                     // int varId = nameId(varPair.first + "_" + std::to_string(id));
+    //                                     // _operators.at(taskId).addArgument(varId);
+    //                                     int a = 0;
+    //                                 }
+    //                             }
+    //                         }
+                            
+    //                     }
+    //                 }
+    //                 assert(numFound == 1);
+    //             }
+    //         }
+    //         int a = 0;
+    //     }
+    // }
+
     for (const predicate_definition& p : predicate_definitions)
         extractPredSorts(p);
-    for (const task& t : primitive_tasks)
+    for (const task& t : primitive_tasks) {
+        Log::i("Primitive task name: %s\n", t.name.c_str());
         extractTaskSorts(t);
+    }
     for (const task& t : abstract_tasks)
         extractTaskSorts(t);
     for (const method& m : methods)
+    {
+        Log::i("Method name: %s\n", m.name.c_str());
         extractMethodSorts(m);
+    }
     
     extractConstants();
 
@@ -51,15 +123,69 @@ HtnInstance::HtnInstance(Parameters& params) :
         Log::d("\n");
     }
 
+    // Create reductions
+    for (method& method : methods) {
+        createReduction(method);
+    }
+
+
     // Create actions
     for (const task& t : primitive_tasks) {
         createAction(t);
     }
 
-    // Create reductions
-    for (method& method : methods) {
-        createReduction(method);
+
+    // Print all the actions
+    for (const auto& [nameId, a] : _operators) {
+        Log::i("Action %s\n", _name_back_table.at(nameId).c_str());
+        // Print all the preconditions
+        for (const auto& pre : a.getPreconditions()) {
+            Log::i("  Precondition %s\n", TOSTR(pre));
+        }
+        // Print all the effects
+        for (const auto& eff : a.getEffects()) {
+            Log::i("  Effect %s\n", TOSTR(eff));
+        }
     }
+
+    // Print all methods
+    for (const auto& [nameId, r] : _methods) {
+        Log::i("Method %s\n", _name_back_table.at(nameId).c_str());
+        for (const auto& pre: r.getPreconditions()) {
+            Log::i("  Precondition %s\n", TOSTR(pre));
+        }
+        for (const auto& pre: r.getExtraPreconditions()) {
+            Log::i("  Extra Precondition %s\n", TOSTR(pre));
+        }
+        // Print all the subtasks 
+        for (const auto& subtask : r.getSubtasks()) {
+            Log::i("  Subtask %s\n", Names::to_SMT_string(subtask).c_str());
+        }
+    }
+
+    // if (_params.isNonzero("useLiftedTreePathEncoder")) {
+        // Add at first subtask of each method a special action with the preconditions of the method
+        // for (auto& [nameId, r] : _methods) {
+        //     Log::i("Method %s\n", _name_back_table.at(nameId).c_str());
+        //     // Print the precondition
+        //     // Log::i("  Precondition %s\n", TOSTR(r.getPrecondition()));
+        //     // Check if we have the special action with the precondition of this method
+        //     std::string nameActionPrecondition = "<method_prec>" + _name_back_table.at(nameId);
+
+        //     // Check if we already have this action
+        //     bool found = false;
+        //     for (auto& [nameId2, a] : _operators) {
+        //         if (_name_back_table.at(nameId2) == nameActionPrecondition) {
+        //             Log::i("Action %s\n", _name_back_table.at(nameId2).c_str());
+        //             found = true;
+        //             // Create the subtask
+        //             USignature subtaskPrecondition = USignature(nameId2, a._args);
+
+        //             // convertArguments(nameId, a._args);
+        //             break;
+        //         }
+        //     }
+        // }
 
     if (_params.isNonzero("stats")) {
         printStatistics();
@@ -88,15 +214,32 @@ ParsedProblem* HtnInstance::parse(std::string domainFile, std::string problemFil
         exit(1);
     }
 
-    char* args[3];
-    args[0] = (char*)firstArg;
-    args[1] = (char*)domainStr;
-    args[2] = (char*)problemStr;
 
-    ParsedProblem* p = new ParsedProblem();
-    optind = 1;
-    run_pandaPIparser(3, args, *p);
-    return p;
+    if (_params.isNonzero("useLiftedTreePathEncoder")) {
+        char* args[4];
+        args[0] = (char*)firstArg;
+        args[1] = (char*)domainStr;
+        args[2] = (char*)problemStr;
+        // Add parameter to prevent split
+        args[3] = (char*)"-s";
+
+        ParsedProblem* p = new ParsedProblem();
+        optind = 1;
+        run_pandaPIparser(4, args, *p);
+        return p;
+    } else {
+        char* args[3];
+        args[0] = (char*)firstArg;
+        args[1] = (char*)domainStr;
+        args[2] = (char*)problemStr;
+
+        ParsedProblem* p = new ParsedProblem();
+        optind = 1;
+        run_pandaPIparser(3, args, *p);
+        return p;
+    }
+
+
 }
 
 void HtnInstance::printStatistics() {
@@ -204,11 +347,17 @@ void HtnInstance::primitivizeSimpleReductions() {
         if (!_operators.count(childId)) continue;
         
         // Primitive subtask
+        if (_operators.at(childId).getArguments().size() != childSig._args.size()) {
+            int dbg = 0;
+            std::string name = "__SURROGATE*" + std::string(TOSTR(entry.first)) + "*" + std::string(TOSTR(childId)) + "*";
+            Log::d("SURROGATE %s %i\n", name.c_str(), entry.first);
+            continue;
+        }
         Substitution s(_operators.at(childId).getArguments(), childSig._args);
         Action childAct = _operators.at(childId).substitute(s);
         std::string name = "__SURROGATE*" + std::string(TOSTR(entry.first)) + "*" + std::string(TOSTR(childId)) + "*";
         int id = nameId(name);
-        Log::d("SURROGATE %s %i\n", name.c_str(), entry.first);
+        // Log::d("SURROGATE %s %i\n", name.c_str(), entry.first);
         _operators[id] = Action(id, red.getArguments());
         for (const auto& pre : red.getPreconditions()) _operators[id].addPrecondition(pre);
         for (const auto& pre : red.getExtraPreconditions()) _operators[id].addExtraPrecondition(pre);
@@ -394,6 +543,15 @@ void HtnInstance::extractConstants() {
 }
 
 Reduction& HtnInstance::createReduction(method& method) {
+
+    Log::i("Creating reduction for method \"%s\"\n", method.name.c_str());
+
+    // If the method start with _splitting, pass it
+    // if (method.name.rfind("_splitting", 0) == 0) {
+    //     Log::i("Skipping splitting method \"%s\"\n", method.name.c_str());
+    //     return _methods[nameId(method.at)];
+    // }
+
     int id = nameId(method.name);
     std::vector<int> args = convertArguments(id, method.vars);
     
@@ -417,6 +575,7 @@ Reduction& HtnInstance::createReduction(method& method) {
 
     // Go through expansion of the method
     std::map<std::string, size_t> subtaskTagToIndex;   
+
     for (const plan_step& st : method.ps) {
         
         // Normalize task name
@@ -431,24 +590,60 @@ Reduction& HtnInstance::createReduction(method& method) {
             task precTask;
             size_t maxSize = 0;
             int numFound = 0;
-            for (const task& t : primitive_tasks) {
+            for (task& t : primitive_tasks) {
                 
                 // Normalize task name
                 std::string taskName = t.name;
                 Regex::extractCoreNameOfSplittingMethod(taskName);
 
                 //Log::d(" ~~~ %s\n", taskName.c_str());
-                if (subtaskName.rfind(taskName) != std::string::npos) {
+                // if (subtaskName.rfind(taskName) != std::string::npos) {
+                if ((_params.isNonzero("useLiftedTreePathEncoder") && subtaskName == taskName) || (!_params.isNonzero("useLiftedTreePathEncoder") && subtaskName.rfind(taskName) != std::string::npos)) {
 
                     size_t size = t.name.size();
                     if (size < maxSize) continue;
                     maxSize = size;
 
+                    Log::i("Found submethod precond \"%s\" for method \"%s\"\n", subtaskName.c_str(), method.name.c_str());
+
                     numFound++;
+
+                    // if (_params.isNonzero("useLiftedTreePathEncoder")) {
+                    //     if (!(t.vars.size() == method.vars.size())) {
+                    //         // Copy all the argugment of the method into the method precondition task (we want this action to have the same signature as the method)
+                    //         for (const auto& varPair : method.vars) {
+                    //             // Add it if it is not already there
+                    //             bool found = false;
+                    //             for (const auto& varPair2 : t.vars) {
+                    //                 if (varPair.first == varPair2.first) {
+                    //                     found = true;
+                    //                     break;
+                    //                 }
+                    //             }
+                    //             if (!found) {
+                    //                 t.vars.push_back(varPair);
+                    //                 t.number_of_original_vars++;
+                    //                 int taskId = nameId(t.name);
+                    //                 int varId = nameId(varPair.first + "_" + std::to_string(id));
+                    //                 // _operators.at(taskId).addArgument(varId);
+                    //                 int a = 0;
+                    //             }
+                    //         }
+                    //     }
+                    // }
+
                     precTask = t;
+
+
                 }
             }
-            assert(numFound >= 1);
+
+            if (_params.isNonzero("useLiftedTreePathEncoder")) {
+                assert(numFound == 1);
+            } else {
+                assert(numFound >= 1);
+            }
+            Log::d("Found %i primitive tasks for method precondition %s\n", numFound, subtaskName.c_str());
             Log::d("- Using %i preconds of prim. task %s as preconds of method %s\n",
                     precTask.prec.size() + precTask.constraints.size(), precTask.name.c_str(), st.task.c_str());
 
@@ -472,6 +667,27 @@ Reduction& HtnInstance::createReduction(method& method) {
             }
 
             // (Do not add the task to the method's subtasks)
+            // if (!(precTask.vars.size() == args.size())) {
+            //     Log::e("Number of arguments of method precondition task %s does not match number of arguments of method %s!\n",
+            //             precTask.name.c_str(), method.name.c_str());
+            //     Log::e("  %i != %i\n", precTask.vars.size(), args.size());
+            // }
+            // assert(precTask.vars.size() == args.size());
+
+            if (_params.isNonzero("useLiftedTreePathEncoder")) {
+                // if (!(precTask.vars.size() == method.vars.size())) {
+                //     // Copy all the argugment of the method into the method precondition task
+                //     precTask.vars.clear();
+                //     for (const auto& varPair : method.vars) {
+                //         precTask.vars.push_back(varPair);
+                //         precTask.number_of_original_vars++;
+                //     }
+                //     precTask.number_of_original_vars = precTask.vars.size();
+                // }
+                // _methods[id].addSubtask(USignature(nameId(precTask.name), args));
+                _methods[id].addSubtask(USignature(nameId(precTask.name), convertArguments(id, precTask.vars)));
+                subtaskTagToIndex[st.id] = subtaskTagToIndex.size();   
+            }
 
         } else {
             // Actual subtask
@@ -481,8 +697,9 @@ Reduction& HtnInstance::createReduction(method& method) {
     }
 
     // Process constraints of the method
-    for (auto& pre : extractEqualityConstraints(id, condLiterals, method.vars))
+    for (auto& pre : extractEqualityConstraints(id, condLiterals, method.vars)) {
         _methods[id].addPrecondition(std::move(pre));
+    }
 
     // Process preconditions of the method
     for (const literal& lit : condLiterals) {
@@ -515,6 +732,7 @@ Reduction& HtnInstance::createReduction(method& method) {
     }
     Log::log_notime(Log::V4_DEBUG, "\n");
 
+    // Reduction& reduction = _methods[id];
     return _methods[id];
 }
 
@@ -691,7 +909,7 @@ std::vector<int> HtnInstance::replaceVariablesWithQConstants(const HtnOp& op,
     if (op.getArguments().empty()) return std::vector<int>();
     std::vector<int> vecFailure(1, -1);
 
-
+    
     // USignature newSig_test(op.getSignature()._name_id, op.getArguments());
     // if (layerIdx == 3 and pos == 12) {
     //     int dbg = 0;
@@ -760,7 +978,7 @@ std::vector<int> HtnInstance::replaceVariablesWithQConstants(const HtnOp& op,
 
     // Remember exact domain of each q constant for this operation
     USignature newSig(op.getSignature()._name_id, args);
-    Log::d("Update Domain of: %s\n", Names::to_SMT_string(newSig).c_str());
+    Log::d("Update Domain of: %s (num: %i)\n", Names::to_SMT_string(newSig).c_str(),  domainsPerQConst.size());
     // if (Names::to_SMT_string(newSig, true) == "ACTION____SURROGATE*m_drive_to_ordering_0*drive*-Q_3-12_location%0_1aed25e8913b0329-Q_2-8_location%0_e4354a9774db1231-truck_0") {
     //     int dbg = 0;
     // }

@@ -107,9 +107,11 @@ private:
     void propagateActions(size_t offset);
     void propagateActionsWithUniqueID(size_t offset);
     void propagateReductions(size_t offset);
+    void propagateReductionsWithUniqueID(size_t offset);
     std::vector<USignature> instantiateAllActionsOfTask(const USignature& task);
     std::vector<USignature> instantiateAllReductionsOfTask(const USignature& task);
     void initializeNextEffects();
+    void initializeNextEffectsPrimitiveTree(Position& newPos);
     void initializeFact(Position& newPos, const USignature& fact);
     void addQConstantTypeConstraints(const USignature& op);
 
