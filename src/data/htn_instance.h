@@ -324,6 +324,7 @@ public:
 private:
 
     void primitivizeSimpleReductions();
+    void primitivizeSimpleReductionsLiftedTreePath();
     
     std::vector<int> convertArguments(int predNameId, const std::vector<std::pair<std::string, std::string>>& vars);
     std::vector<int> convertArguments(int predNameId, const std::vector<std::string>& vars);

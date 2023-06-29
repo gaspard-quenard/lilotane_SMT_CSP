@@ -98,6 +98,123 @@ HtnInstance::HtnInstance(Parameters& params) :
     //     }
     // }
 
+
+        // For LiftedTreePath, we need to report the method equality constrains to its first subtask.
+        // So two cases here, either we already have a <method_precondition> primitive action for this method as a first subtask
+        // In which case, we add the constrains to the <method_precondition> primitive subtasks
+        // Or we don't have such a primitive action, in which case we need to create a method_precondition primitive action for this method and add the constrains to it
+        if (_params.isNonzero("useLiftedTreePathEncoder")) {
+
+            for (method& method : methods) {
+
+                if (method.constraints.size() == 0) continue;
+
+                bool hasMethodPreconditionPrimitiveAction = false;
+
+                for (const plan_step& st : method.ps) {
+        
+                    // Normalize task name
+                    std::string subtaskName = st.task;
+                    Regex::extractCoreNameOfSplittingMethod(subtaskName);
+                    Log::d("%s\n", subtaskName.c_str());
+
+                    if (subtaskName.rfind(method_precondition_action_name) != std::string::npos) {
+                        // This "subtask" is a method precondition which was compiled out
+                        
+                        // Find primitive task belonging to this method precondition
+                        task precTask;
+                        size_t maxSize = 0;
+                        int numFound = 0;
+                        for (task& t : primitive_tasks) {
+                            
+                            // Normalize task name
+                            std::string taskName = t.name;
+                            Regex::extractCoreNameOfSplittingMethod(taskName);
+
+                            if (subtaskName == taskName) {
+                                hasMethodPreconditionPrimitiveAction = true;
+                                // Add the constrains to the <method_precondition> primitive subtask
+                                t.constraints = method.constraints;
+
+                                // Add all the parameters of the parent method
+                                t.number_of_original_vars = 0;
+                                t.vars.clear();
+                                for (const auto& varPair : method.vars) {
+                                    t.vars.push_back(varPair);
+                                    t.number_of_original_vars++;
+                                }
+                            }
+                        }
+                    }
+                }
+
+
+                if (hasMethodPreconditionPrimitiveAction) {
+                    // We simply add the constraints to the <method_precondition> primitive subtask
+
+                }
+                else {
+                    // We need to create a new action for this method precondition
+                    // parsed_task mPrec_task;
+                    // mPrec_task.name = method_precondition_action_name + method.name;
+                    // mPrec_task.con = pm.prec;
+                    // mPrec_task.arguments = new var_declaration();
+
+                    task mPrec_task2;
+                    mPrec_task2.name = method_precondition_action_name + method.name;
+                    mPrec_task2.constraints = method.constraints;
+
+                    // Add as well all the parameters of the parent method
+                    mPrec_task2.number_of_original_vars = 0;
+                    for (const auto& varPair : method.vars) {
+                        mPrec_task2.vars.push_back(varPair);
+                        mPrec_task2.number_of_original_vars++;
+                    }
+
+                    mPrec_task2.check_integrity();
+
+                    // Add the primitive task to the list of primitive tasks
+                    primitive_tasks.push_back(mPrec_task2);
+                    task_name_map[mPrec_task2.name] = mPrec_task2;
+
+                    plan_step ps;
+                    ps.id = "mprec";
+                    ps.task = mPrec_task2.name;
+                    for (auto [v,_] : mPrec_task2.vars)
+                        ps.args.push_back(v);
+
+                    // Get the id of the first task of the method
+                    // To do that, create a set with all the tasks of the method
+                    // and then, remove all the tasks which follow another task
+                    std::set<std::string> tasksOfMethod;
+
+                    // Add all the tasks of the method
+                    for (const plan_step& ps : method.ps)
+                        tasksOfMethod.insert(ps.id);
+
+                    // Remove all the tasks which follow another task
+                    for (const auto& [t1,t2] : method.ordering)
+                        tasksOfMethod.erase(t2);
+
+                    // Confirm that there is only one task left
+                    assert(tasksOfMethod.size() == 1);
+
+                    method.ordering.push_back(make_pair(ps.id, *tasksOfMethod.begin()));
+                    method.ps.push_back(ps);
+                }
+
+
+
+
+
+                // First, get the if of first subtask of the method
+                std::string firstSubtaskId = method.ordering[0].first;
+
+            }
+        }
+
+
+
     for (const predicate_definition& p : predicate_definitions)
         extractPredSorts(p);
     for (const task& t : primitive_tasks) {
@@ -193,7 +310,12 @@ HtnInstance::HtnInstance(Parameters& params) :
     }
 
     // Create replacements for simple methods with only one subtask
-    if (_params.isNonzero("psr")) primitivizeSimpleReductions();
+    if (_params.isNonzero("psr")) {
+        if (_params.isNonzero("useLiftedTreePathEncoder")) primitivizeSimpleReductionsLiftedTreePath();
+        else primitivizeSimpleReductions();
+    }
+        
+    
 
     Log::i("%i operators and %i methods created.\n", _operators.size(), _methods.size());
 }
@@ -346,13 +468,6 @@ void HtnInstance::primitivizeSimpleReductions() {
         int childId = childSig._name_id;
         if (!_operators.count(childId)) continue;
         
-        // Primitive subtask
-        if (_operators.at(childId).getArguments().size() != childSig._args.size()) {
-            int dbg = 0;
-            std::string name = "__SURROGATE*" + std::string(TOSTR(entry.first)) + "*" + std::string(TOSTR(childId)) + "*";
-            Log::d("SURROGATE %s %i\n", name.c_str(), entry.first);
-            continue;
-        }
         Substitution s(_operators.at(childId).getArguments(), childSig._args);
         Action childAct = _operators.at(childId).substitute(s);
         std::string name = "__SURROGATE*" + std::string(TOSTR(entry.first)) + "*" + std::string(TOSTR(childId)) + "*";
@@ -367,6 +482,63 @@ void HtnInstance::primitivizeSimpleReductions() {
         _reduction_to_primitivization[entry.first] = id;
         _signature_sorts_table[id] = _signature_sorts_table[entry.first];
         _primitivization_to_parent_and_child[id] = std::pair<int, int>(entry.first, childId);
+    }
+}
+
+
+void HtnInstance::primitivizeSimpleReductionsLiftedTreePath() {
+
+    for (const auto& entry : _methods) {
+        const Reduction& red = entry.second;
+
+        // Here, the reduction can be primitive if either it has a single subtasks, 
+        // or if it has two subtasks and the first one if just the special action to handle precondition of the method
+        if (red.getSubtasks().size() == 1) {
+            // Single-subtask method
+            USignature childSig = red.getSubtasks().at(0);
+            int childId = childSig._name_id;
+            if (!_operators.count(childId)) continue;
+            
+            Substitution s(_operators.at(childId).getArguments(), childSig._args);
+            Action childAct = _operators.at(childId).substitute(s);
+            std::string name = "__SURROGATE*" + std::string(TOSTR(entry.first)) + "*" + std::string(TOSTR(childId)) + "*";
+            int id = nameId(name);
+            // Log::d("SURROGATE %s %i\n", name.c_str(), entry.first);
+            _operators[id] = Action(id, red.getArguments());
+            for (const auto& pre : red.getPreconditions()) _operators[id].addPrecondition(pre);
+            for (const auto& pre : red.getExtraPreconditions()) _operators[id].addExtraPrecondition(pre);
+            for (const auto& pre : childAct.getPreconditions()) _operators[id].addPrecondition(pre);
+            for (const auto& pre : childAct.getExtraPreconditions()) _operators[id].addExtraPrecondition(pre);
+            for (const auto& eff : childAct.getEffects()) _operators[id].addEffect(eff);
+            _reduction_to_primitivization[entry.first] = id;
+            _signature_sorts_table[id] = _signature_sorts_table[entry.first];
+            _primitivization_to_parent_and_child[id] = std::pair<int, int>(entry.first, childId);
+        }
+
+        // Check if there are two subtasks and the first one contains the string <method_prec>
+        else if (red.getSubtasks().size() == 2 && _name_back_table[red.getSubtasks().at(0)._name_id].find("<method_prec>") != std::string::npos) {
+
+            // Single-subtask method
+            USignature childSig = red.getSubtasks().at(1);
+            int childId = childSig._name_id;
+            if (!_operators.count(childId)) continue;
+            
+            Substitution s(_operators.at(childId).getArguments(), childSig._args);
+            Action childAct = _operators.at(childId).substitute(s);
+            std::string name = "__SURROGATE*" + std::string(TOSTR(entry.first)) + "*" + std::string(TOSTR(childId)) + "*";
+            int id = nameId(name);
+            Log::d("SURROGATE %s %i\n", name.c_str(), entry.first);
+
+            _operators[id] = Action(id, red.getArguments());
+            for (const auto& pre : red.getPreconditions()) _operators[id].addPrecondition(pre);
+            for (const auto& pre : red.getExtraPreconditions()) _operators[id].addExtraPrecondition(pre);
+            for (const auto& pre : childAct.getPreconditions()) _operators[id].addPrecondition(pre);
+            for (const auto& pre : childAct.getExtraPreconditions()) _operators[id].addExtraPrecondition(pre);
+            for (const auto& eff : childAct.getEffects()) _operators[id].addEffect(eff);
+            _reduction_to_primitivization[entry.first] = id;
+            _signature_sorts_table[id] = _signature_sorts_table[entry.first];
+            _primitivization_to_parent_and_child[id] = std::pair<int, int>(entry.first, childId);
+        }  
     }
 }
 
