@@ -29,6 +29,8 @@ private:
     size_t _layer_idx;
     size_t _pos;
 
+    size_t _ltp_pos;
+
     size_t _above_pos = -1;
 
     USigSet _actions;
@@ -48,6 +50,15 @@ private:
 
     NodeHashMap<int, USigSetUniqueID> _previous;
     NodeHashMap<int, USigSetUniqueID> _nexts;
+
+    // test (under the test...)
+    // Get all the next and previous which are not blank actions
+    // Get all the new next and previous which are not blank actions
+    NodeHashMap<int, PositionUSigSetUniqueID> _previous_primitive_tree;
+    NodeHashMap<int, PositionUSigSetUniqueID> _nexts_primitive_tree;
+    NodeHashMap<int, PositionUSigSetUniqueID> _new_previous_primitive_tree;
+    NodeHashMap<int, PositionUSigSetUniqueID> _new_nexts_primitive_tree;
+
     // Indicate for each Usignature its last parent method (only one parent method is allowed)
     // NodeHashMap<USignature, int, USignatureHasher> _last_parent_method_id;
 
@@ -75,8 +86,13 @@ private:
     IndirectFactSupportMap* _pos_indir_fact_supports = nullptr;
     IndirectFactSupportMap* _neg_indir_fact_supports = nullptr;
 
-    NodeHashMap<USignature, std::vector<TypeConstraint>, USignatureHasher> _q_constants_type_constraints;
-    NodeHashMap<USignature, std::vector<SubstitutionConstraint>, USignatureHasher> _substitution_constraints;
+    // NodeHashMap<USignature, std::vector<TypeConstraint>, USignatureHasher> _q_constants_type_constraints;
+    // NodeHashMap<USignature, std::vector<SubstitutionConstraint>, USignatureHasher> _substitution_constraints;
+
+    NodeHashMap<USignature, std::vector<TypeConstraint>, USignatureHasherWithUniqueID, USignatureEqualityWithUniqueID> _q_constants_type_constraints;
+    NodeHashMap<USignature, std::vector<SubstitutionConstraint>, USignatureHasherWithUniqueID, USignatureEqualityWithUniqueID> _substitution_constraints;
+
+
 
     size_t _max_expansion_size = 1;
 
@@ -97,6 +113,7 @@ public:
     Position();
     void setPos(size_t layerIdx, size_t pos);
     void setAbovePos(size_t abovePos);
+    void setLtpPos(size_t ltpPos);
 
     void addQFact(const USignature& qfact);
     void addTrueFact(const USignature& fact);
@@ -133,6 +150,14 @@ public:
     // TEST ===========================================================
     void addPrevious(const USignature& current, const USignature& previous);
     void addNexts(const USignature& current, const USignature& next);
+
+
+    void addPreviousPrimitiveTree(const USignature& current, const PositionedUSig& previous);
+    void addNextsPrimitiveTree(const USignature& current, const PositionedUSig& next);
+
+    void addNewPreviousPrimitiveTree(const USignature& current, const PositionedUSig& previous);
+    void addNewNextsPrimitiveTree(const USignature& current, const PositionedUSig& next);
+
     // void addLastParentMethodId(const USignature& current, int lastParentMethodId);
     void addActionInPrimitiveTree(const USignature& action);
     void removeActionInPrimitiveTree(const USignature& action);
@@ -161,8 +186,8 @@ public:
     NodeHashMap<USignature, USigSet, USignatureHasher>& getNegFactSupports();
     IndirectFactSupportMap& getPosIndirectFactSupports();
     IndirectFactSupportMap& getNegIndirectFactSupports();
-    const NodeHashMap<USignature, std::vector<TypeConstraint>, USignatureHasher>& getQConstantsTypeConstraints() const;
-    NodeHashMap<USignature, std::vector<SubstitutionConstraint>, USignatureHasher>& getSubstitutionConstraints() {
+    const NodeHashMap<USignature, std::vector<TypeConstraint>, USignatureHasherWithUniqueID, USignatureEqualityWithUniqueID>& getQConstantsTypeConstraints() const;
+    NodeHashMap<USignature, std::vector<SubstitutionConstraint>, USignatureHasherWithUniqueID, USignatureEqualityWithUniqueID>& getSubstitutionConstraints() {
         return _substitution_constraints;
     }
 
@@ -184,6 +209,9 @@ public:
     NodeHashMap<USignature, int, USignatureHasher>& getLastParentMethodId();
     NodeHashSet<USignature, USignatureHasherWithUniqueID, USignatureEqualityWithUniqueID>& getActionsInPrimitiveTree();
 
+    NodeHashMap<int, PositionUSigSetUniqueID>& getNextsPrimitiveTree();
+    NodeHashMap<int, PositionUSigSetUniqueID>& getNewNextsPrimitiveTree();
+
 
     void setActionOrReductionTrue(USignature& actionOrReduction);
     USignature& getActionOrReductionTrue();
@@ -192,6 +220,8 @@ public:
     size_t getLayerIndex() const;
     size_t getPositionIndex() const;
     size_t getAbovePositionIndex() const;
+
+    size_t getLtpPos() const;
     
     void clearAfterInstantiation();
     void clearAtPastPosition();

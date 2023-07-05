@@ -99,119 +99,114 @@ HtnInstance::HtnInstance(Parameters& params) :
     // }
 
 
-        // For LiftedTreePath, we need to report the method equality constrains to its first subtask.
-        // So two cases here, either we already have a <method_precondition> primitive action for this method as a first subtask
-        // In which case, we add the constrains to the <method_precondition> primitive subtasks
-        // Or we don't have such a primitive action, in which case we need to create a method_precondition primitive action for this method and add the constrains to it
-        if (_params.isNonzero("useLiftedTreePathEncoder")) {
+        // For LiftedTreePath, we need to report the method equality constrains and all parameters of the method into its first subtask.
+    // So two cases here, either we already have a <method_precondition> primitive action for this method as a first subtask
+    // In which case, we add the constrains to the <method_precondition> primitive subtask (and all missing parameters of the method)
+    // Or we don't have such a primitive action, in that case we need to create a method_precondition primitive action for this method and add the constrains and 
+    // all parameters of the method to it
+    if (_params.isNonzero("useLiftedTreePathEncoder")) {
 
-            for (method& method : methods) {
+        for (method& method : methods) {
 
-                if (method.constraints.size() == 0) continue;
 
-                bool hasMethodPreconditionPrimitiveAction = false;
+            bool hasMethodPreconditionPrimitiveAction = false;
 
-                for (const plan_step& st : method.ps) {
-        
-                    // Normalize task name
-                    std::string subtaskName = st.task;
-                    Regex::extractCoreNameOfSplittingMethod(subtaskName);
-                    Log::d("%s\n", subtaskName.c_str());
+            for (const plan_step& st : method.ps) {
+    
+                // Normalize task name
+                std::string subtaskName = st.task;
+                Regex::extractCoreNameOfSplittingMethod(subtaskName);
+                Log::d("%s\n", subtaskName.c_str());
 
-                    if (subtaskName.rfind(method_precondition_action_name) != std::string::npos) {
-                        // This "subtask" is a method precondition which was compiled out
+                if (subtaskName.rfind(method_precondition_action_name) != std::string::npos) {
+                    // This "subtask" is a method precondition which was compiled out
+                    
+                    // Find primitive task belonging to this method precondition
+                    for (task& t : primitive_tasks) {
                         
-                        // Find primitive task belonging to this method precondition
-                        task precTask;
-                        size_t maxSize = 0;
-                        int numFound = 0;
-                        for (task& t : primitive_tasks) {
-                            
-                            // Normalize task name
-                            std::string taskName = t.name;
-                            Regex::extractCoreNameOfSplittingMethod(taskName);
+                        // Normalize task name
+                        std::string taskName = t.name;
+                        Regex::extractCoreNameOfSplittingMethod(taskName);
 
-                            if (subtaskName == taskName) {
-                                hasMethodPreconditionPrimitiveAction = true;
-                                // Add the constrains to the <method_precondition> primitive subtask
-                                t.constraints = method.constraints;
+                        if (subtaskName == taskName) {
+                            hasMethodPreconditionPrimitiveAction = true;
+                            // Add the constrains to the <method_precondition> primitive subtask
 
-                                // Add all the parameters of the parent method
-                                t.number_of_original_vars = 0;
-                                t.vars.clear();
-                                for (const auto& varPair : method.vars) {
-                                    t.vars.push_back(varPair);
-                                    t.number_of_original_vars++;
-                                }
+                            for (const auto& c : method.constraints)
+                                t.constraints.push_back(c);
+
+                            // Add all the parameters of the parent method
+                            t.number_of_original_vars = 0;
+                            t.vars.clear();
+                            for (const auto& varPair : method.vars) {
+                                t.vars.push_back(varPair);
+                                t.number_of_original_vars++;
                             }
                         }
                     }
                 }
+            }
 
 
-                if (hasMethodPreconditionPrimitiveAction) {
-                    // We simply add the constraints to the <method_precondition> primitive subtask
+            if (!hasMethodPreconditionPrimitiveAction) {
+                // We need to create a new action for this method precondition
+                // parsed_task mPrec_task;
+                // mPrec_task.name = method_precondition_action_name + method.name;
+                // mPrec_task.con = pm.prec;
+                // mPrec_task.arguments = new var_declaration();
 
+                task mPrec_task;
+                mPrec_task.name = method_precondition_action_name + method.name;
+                mPrec_task.constraints = method.constraints;
+
+                // Add as well all the parameters of the parent method
+                mPrec_task.number_of_original_vars = 0;
+                for (const auto& varPair : method.vars) {
+                    mPrec_task.vars.push_back(varPair);
+                    mPrec_task.number_of_original_vars++;
                 }
-                else {
-                    // We need to create a new action for this method precondition
-                    // parsed_task mPrec_task;
-                    // mPrec_task.name = method_precondition_action_name + method.name;
-                    // mPrec_task.con = pm.prec;
-                    // mPrec_task.arguments = new var_declaration();
 
-                    task mPrec_task2;
-                    mPrec_task2.name = method_precondition_action_name + method.name;
-                    mPrec_task2.constraints = method.constraints;
+                mPrec_task.check_integrity();
 
-                    // Add as well all the parameters of the parent method
-                    mPrec_task2.number_of_original_vars = 0;
-                    for (const auto& varPair : method.vars) {
-                        mPrec_task2.vars.push_back(varPair);
-                        mPrec_task2.number_of_original_vars++;
-                    }
+                // Add the primitive task to the list of primitive tasks
+                primitive_tasks.push_back(mPrec_task);
+                task_name_map[mPrec_task.name] = mPrec_task;
 
-                    mPrec_task2.check_integrity();
+                // Now, add this primitive task as the first subtask of the method
+                plan_step ps;
+                ps.id = "mprec";
+                ps.task = mPrec_task.name;
+                for (auto [v,_] : mPrec_task.vars)
+                    ps.args.push_back(v);
 
-                    // Add the primitive task to the list of primitive tasks
-                    primitive_tasks.push_back(mPrec_task2);
-                    task_name_map[mPrec_task2.name] = mPrec_task2;
+                // Get the id of the first task of the method
+                // To do that, create a set with all the tasks of the method
+                // and then, remove all the tasks which follow another task
+                std::set<std::string> tasksOfMethod;
 
-                    plan_step ps;
-                    ps.id = "mprec";
-                    ps.task = mPrec_task2.name;
-                    for (auto [v,_] : mPrec_task2.vars)
-                        ps.args.push_back(v);
+                // Add all the tasks of the method
+                for (const plan_step& ps : method.ps)
+                    tasksOfMethod.insert(ps.id);
 
-                    // Get the id of the first task of the method
-                    // To do that, create a set with all the tasks of the method
-                    // and then, remove all the tasks which follow another task
-                    std::set<std::string> tasksOfMethod;
+                // Remove all the tasks which follow another task
+                for (const auto& [t1,t2] : method.ordering)
+                    tasksOfMethod.erase(t2);
 
-                    // Add all the tasks of the method
-                    for (const plan_step& ps : method.ps)
-                        tasksOfMethod.insert(ps.id);
+                // Confirm that there is only one task left (or 0 if this method does not have any subtak)
+                assert(tasksOfMethod.size() <= 1);
 
-                    // Remove all the tasks which follow another task
-                    for (const auto& [t1,t2] : method.ordering)
-                        tasksOfMethod.erase(t2);
-
-                    // Confirm that there is only one task left
-                    assert(tasksOfMethod.size() == 1);
-
+                if (tasksOfMethod.size() == 0) {
+                    // This method does not have any subtask
+                    // So this method does not follow any other task
+                    method.ordering.push_back(make_pair(ps.id, ""));
+                } else {
                     method.ordering.push_back(make_pair(ps.id, *tasksOfMethod.begin()));
-                    method.ps.push_back(ps);
                 }
-
-
-
-
-
-                // First, get the if of first subtask of the method
-                std::string firstSubtaskId = method.ordering[0].first;
-
+                
+                method.ps.push_back(ps);
             }
         }
+    }
 
 
 
@@ -910,6 +905,7 @@ Reduction& HtnInstance::createReduction(method& method) {
 
 Action& HtnInstance::createAction(const task& task) {
     int id = nameId(task.name);
+    Log::i("Task name: %s\n", task.name.c_str());
     std::vector<int> args = convertArguments(id, task.vars);
 
     assert(_operators.count(id) == 0);
@@ -1081,11 +1077,7 @@ std::vector<int> HtnInstance::replaceVariablesWithQConstants(const HtnOp& op,
     if (op.getArguments().empty()) return std::vector<int>();
     std::vector<int> vecFailure(1, -1);
 
-    
-    // USignature newSig_test(op.getSignature()._name_id, op.getArguments());
-    // if (layerIdx == 3 and pos == 12) {
-    //     int dbg = 0;
-    // }
+
 
     std::vector<int> args = op.getArguments();
     std::vector<int> varargIndices;
@@ -1173,6 +1165,9 @@ void HtnInstance::inheritQConstFromParent(USignature child, USignature parent) {
         if (!_q_const_to_op_domains[arg].count(parent)) continue;
 
         _q_const_to_op_domains[arg][child] = _q_const_to_op_domains[arg][parent];
+
+        // To debug, print the size of the domain
+        Log::i("Size domain of %s: %i\n", Names::to_SMT_string(child, true).c_str(), _q_const_to_op_domains[arg][child].size());
     }
 }
 // END TES LIFTED TREE PATH

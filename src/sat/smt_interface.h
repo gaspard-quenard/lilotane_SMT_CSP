@@ -32,6 +32,7 @@ struct NameAndLayerElement
     std::string full_name;
     int layer;
     int layerElement;
+    int ltp_pos;
     bool isSubstitute = false;
     cvc5::Term cvc5Term;
     cvc5::Term cvc5TermNeg;
@@ -340,7 +341,7 @@ public:
 
     int idx = 0;
 
-    inline void addVar(int var_id, std::string var_name, int layer, int layerElement, bool isSubstituteVar = false, int substituteVarQConstId = -1, int substituteVarTrueConstId = -1)
+    inline void addVar(int var_id, std::string var_name, int layer, int layerElement, int ltpPos = -1, bool isSubstituteVar = false, int substituteVarQConstId = -1, int substituteVarTrueConstId = -1)
     {
 
         if (dict_var_id_to_name.size() > var_id - 1)
@@ -359,6 +360,7 @@ public:
 
                 dict_var_id_to_name[var_id - 1].layer = layer;
                 dict_var_id_to_name[var_id - 1].layerElement = layerElement;
+                dict_var_id_to_name[var_id - 1].ltp_pos = ltpPos;
 
                 if (layer == -1)
                 {
@@ -372,8 +374,11 @@ public:
                         dict_var_id_to_name[var_id - 1].full_name = var_name;
                     }
                 }
-                else
-                    dict_var_id_to_name[var_id - 1].full_name = var_name + "__" + std::to_string(layer) + "_" + std::to_string(layerElement);
+                else {
+                    // dict_var_id_to_name[var_id - 1].full_name = var_name + "__" + std::to_string(layer) + "_" + std::to_string(layerElement);
+                    dict_var_id_to_name[var_id - 1].full_name = var_name + "__" + std::to_string(ltpPos);
+
+                }
 
                 if (use_one_var_for_qconst && isSubstituteVar)
                 {
@@ -502,8 +507,10 @@ public:
             }
         }
 
-        else
-            nameAndLayerElement.full_name = var_name + "__" + std::to_string(layer) + "_" + std::to_string(layerElement);
+        else {
+            // nameAndLayerElement.full_name = var_name + "__" + std::to_string(layer) + "_" + std::to_string(layerElement);
+            nameAndLayerElement.full_name = var_name + "__" + std::to_string(ltpPos);
+        }
 
         if (use_one_var_for_qconst && isSubstituteVar)
         {
@@ -1080,20 +1087,28 @@ public:
 
     inline void reset_solver() {
         if (useCVC5) {
+            dict_var_id_to_name.clear();
             _solverCVC5.resetAssertions();
         } else {
+            dict_var_id_to_name.clear();
             _solverZ3.reset();
         }
     }
 
 
-    inline void print_formula()
+    inline void print_formula(std::string filename)
     {
-        std::cout << "WRITING FORMULA TO FILE" << std::endl;
+
+        if (filename.length() == 0) {
+            filename == "FORMULA.SMT";
+        }
+
+
+        std::cout << "WRITING FORMULA TO FILE: " << filename << std::endl;
 
         // Create final formula file
         std::ofstream ffile;
-        ffile.open("FORMULA.SMT");
+        ffile.open(filename);
 
         if (useCVC5)
         {

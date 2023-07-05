@@ -213,10 +213,24 @@ struct USignatureEqualityWithUniqueID {
     }
 };
 
+struct PositionUSignatureEqualityWithUniqueID {
+    bool operator()(const PositionedUSig& lhs, const PositionedUSig& rhs) const {
+        return (lhs.layer == rhs.layer) && 
+               (lhs.pos == rhs.pos) && 
+               (lhs.usig._args == rhs.usig._args) &&
+               (lhs.usig._name_id == rhs.usig._name_id) &&
+               (lhs.usig._unique_id == rhs.usig._unique_id) &&
+               (lhs.usig.first_child_of_reduction == rhs.usig.first_child_of_reduction);
+    }
+};
+
+
+
 
 typedef FlatHashSet<Signature, SignatureHasher> SigSet;
 typedef FlatHashSet<USignature, USignatureHasher> USigSet;
 typedef FlatHashSet<USignature, USignatureHasherWithUniqueID, USignatureEqualityWithUniqueID> USigSetUniqueID;
+typedef FlatHashSet<PositionedUSig, PositionedUSigHasherWithUniqueID, PositionUSignatureEqualityWithUniqueID> PositionUSigSetUniqueID;
 
 namespace Sig {
     const static USignature NONE_SIG = USignature(-1, std::vector<int>());

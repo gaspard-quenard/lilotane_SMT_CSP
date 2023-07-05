@@ -58,7 +58,14 @@ void PlanWriter::outputPlan(Plan& _plan) {
             //     break;
             // }
 
-            const USignature& childSig = parentRed.getSubtasks()[0];
+            int idxActionInSubtasks = 0;
+            if (parentRed.getSubtasks().size() == 2) {
+                // The first subtasks if the special action which handle the method precondition
+                // the second subtask is the actual action
+                idxActionInSubtasks = 1;
+            }
+
+            const USignature& childSig = parentRed.getSubtasks()[idxActionInSubtasks];
             USignature childSigCopy = childSig;
             childSigCopy._unique_id = item.id;
             item.abstractTask = childSigCopy;
@@ -132,6 +139,8 @@ void PlanWriter::outputPlan(Plan& _plan) {
         // Verify plan (by copying converted plan stream and putting it back into panda)
         std::stringstream verifyStream;
         verifyStream << planStr << std::endl;
+        Log::i("Verifying plan...\n");
+        Log::i("Plan:\n%s\n", verifyStream.str().c_str());
         bool ok = verify_plan(verifyStream, /*useOrderingInfo=*/true, /*lenientMode=*/false, /*debugMode=*/0);
         if (!ok) {
             Log::e("ERROR: Plan declared invalid by pandaPIparser! Exiting.\n");

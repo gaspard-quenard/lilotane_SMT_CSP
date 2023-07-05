@@ -506,7 +506,7 @@ void Encoding::encodeSubstitutionVars(const USignature& opSig, int opVar, int ar
         if (_useSMTSolver) {
             int idxBinVar = 0;
             for (int v : bamo.getBinNumVar()) {
-                _smt.addVar(v, "__amo_" + std::to_string(idxBinVar++), pos.getLayerIndex(), pos.getPositionIndex());
+                _smt.addVar(v, "__amo_" + std::to_string(idxBinVar++), pos.getLayerIndex(), pos.getPositionIndex(), pos.getLtpPos());
             }
         }
         for (const auto& c : bamo.encode()) {
@@ -1988,7 +1988,7 @@ int Encoding::__interfaceSolver__encodeVariable(VarType type, Position& pos, con
     // int var = _vars.encodeVariable(type, pos, sig);
 
     if (_useSMTSolver) {
-        _smt.addVar(var, Names::to_SMT_string(sig, _htn.isAction(sig)), pos.getLayerIndex(), pos.getPositionIndex());
+        _smt.addVar(var, Names::to_SMT_string(sig, _htn.isAction(sig)), pos.getLayerIndex(), pos.getPositionIndex(), pos.getLtpPos());
     }
 
     return var;
@@ -2004,7 +2004,7 @@ int Encoding::__interfaceSolver__encodeVarPrimitive(int layer, int pos) {
     }
 
     if (_useSMTSolver) {
-        _smt.addVar(var, "__PRIMITIVE___", layer, pos);
+        _smt.addVar(var, "__PRIMITIVE___", layer, pos, -1);
     }
 
     return var;
@@ -2015,7 +2015,7 @@ int Encoding::__interfaceSolver__encodeQConstantEqualityVar(int qconst1, int qco
 
     if (_useSMTSolver) {
         std::string var_name = "__QCONST_EQUALITY___" + std::to_string(qconst1) + "_" + std::to_string(qconst2);
-        _smt.addVar(var, var_name, -1, -1);
+        _smt.addVar(var, var_name, -1, -1, -1);
     }
 
     return var;
@@ -2027,7 +2027,7 @@ int Encoding::__interfaceSolver__varSubstitution(int qConstId, int trueConstId) 
 
     if (_useSMTSolver) {
         const USignature& sigSubst = _vars.sigSubstitute(qConstId, trueConstId);
-        _smt.addVar(var, Names::to_SMT_string(sigSubst), -1, -1, true, qConstId, trueConstId);
+        _smt.addVar(var, Names::to_SMT_string(sigSubst), -1, -1, -1, true, qConstId, trueConstId);
         // _smt.addSubstituteVar(sigSubst, qConstId, trueConstId, var);
     }
 
@@ -2120,9 +2120,9 @@ int Encoding::__interfaceSolver__solve() {
     }
 }
 
-void Encoding::__interfaceSolver__printFormula() {
+void Encoding::__interfaceSolver__printFormula(std::string filename) {
     if (_useSMTSolver) {
-        _smt.print_formula();
+        _smt.print_formula(filename);
     } 
 }
 

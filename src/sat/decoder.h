@@ -146,7 +146,7 @@ std::vector<PlanItem> extractClassicalPlanLiftedTreePath(PlanExtraction mode = P
 
             assert(chosenActions <= 1 || Log::e("Plan error: Added %i actions at step %i!\n", chosenActions, pos));
             
-            if (chosenActions == 0 || isMethodPrecond) {
+            if (chosenActions == 0) {//  || isMethodPrecond) {
                 plan[pos] = {-1, USignature(), USignature(), std::vector<int>()};
             }
         }

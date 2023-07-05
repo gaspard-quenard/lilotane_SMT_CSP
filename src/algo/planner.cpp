@@ -8,6 +8,7 @@
 #include "sat/plan_optimizer.h"
 #include "data/primitive_tree.h"
 #include "data/signature.h"
+#include "sat/variable_position.h"
 
 int terminateSatCall(void* state) {return ((Planner*) state)->getTerminateSatCall();}
 
@@ -197,6 +198,8 @@ void Planner::createFirstLayer() {
     _layers.push_back(new Layer(0, initSize));
     Layer& initLayer = (*_layers[0]);
     initLayer[_pos].setPos(_layer_idx, _pos);
+
+    initLayer[_pos].setLtpPos(VariablePosition::nextVar());
     
     /***** LAYER 0, POSITION 0 ******/
 
@@ -220,6 +223,8 @@ void Planner::createFirstLayer() {
     /***** LAYER 0, POSITION 1 ******/
 
     createNextPosition(); // position 1
+
+    initLayer[_pos].setLtpPos(VariablePosition::nextVar());
 
     // Create virtual goal action
     Action goalAction = _htn.getGoalAction();
@@ -300,6 +305,13 @@ bool Planner::createNextLayer() {
 
         Log::i("Primitive tree construction took %lld ms\n", time_ms);
 
+        debug_write_all_paths_in_file(newLayer, _layer_idx);
+
+        // Remove all blank actions in the primitive tree + indicate all the new successors and predecessors of each action for this layer
+        // cleanPrimitiveTree(newLayer, _layer_idx);
+
+        debug_write_primitive_tree(newLayer, _layer_idx);
+
         _enc.__interfaceSolver__reset();
 
         // if (primitiveTree.size() == 0) {
@@ -332,7 +344,9 @@ bool Planner::createNextLayer() {
 
         // _enc.encode_for_lifted_tree_path_ensure_one_init_action_is_true(_layer_idx);
         _enc.encode_for_lifted_tree_path_ensure_one_init_action_is_true(intialActionsInPrimitiveTree);
-        // _enc.__interfaceSolver__printFormula();        
+
+        // std::string filename = "smt_file_layer_" + std::to_string(_layer_idx) + ".SMT";
+        // _enc.__interfaceSolver__printFormula(filename);        
 
         newLayer.consolidate();
 
@@ -734,6 +748,108 @@ bool Planner::constructPrimitiveTree(Layer& layer, int layerIdx, std::vector<Pos
     return !primitiveTreeIsEmpty;
 }
 
+
+/**
+ * Remove all useless blank actions in the primitive tree and indicate which succcessors are new successor for each action in the primitive tree
+*/
+void Planner::cleanPrimitiveTree(Layer& layer, int layerIdx) {
+
+    NodeHashMap<int, PositionUSigSetUniqueID> mapBlankActionToAllNexts;
+
+    // Iterate over all position in the layer and then iterate over all action which are in the primitive tree in this position
+    for (int posIdx = 1; posIdx < layer.size(); posIdx++) {
+        Position& left = layer[posIdx - 1]; 
+        Position& pos = layer[posIdx]; 
+
+        // Get the above position (to be able to determinate the new successors and predessors of each action (
+        // predecessors and successors of an action which were not defined in the previous layer
+        bool hasAbove = layerIdx > 0;
+        Position NULL_POS;
+        size_t _old_pos = 0;
+        if (hasAbove) {
+            const Layer& oldLayer = *_layers.at(layerIdx-1);
+            while (_old_pos+1 < oldLayer.size() && oldLayer.getSuccessorPos(_old_pos+1) <= (posIdx - 1)) 
+                _old_pos++;
+        }
+        Position& above = (hasAbove ? (*_layers.at(layerIdx-1))[_old_pos] : NULL_POS);
+        
+        NodeHashSet<USignature, USignatureHasherWithUniqueID, USignatureEqualityWithUniqueID> allBlanksActionToRemove;
+
+        for (USignature& aSig : left.getActionsInPrimitiveTree()) {
+
+            if (aSig.shadow_action) {
+                allBlanksActionToRemove.insert(aSig);
+                continue;
+            }
+
+            // Iterate over all the nexts and get all the next which are not a shadow action
+            // To do this, create a set of all the current action to iterate 
+            FlatHashSet<PositionedUSig, PositionedUSigHasherWithUniqueID, PositionUSignatureEqualityWithUniqueID> allBlanksActionToIterate;
+            // Initialize it with all the nexts blank action
+            for (USignature& next : left.getNexts().at(aSig._unique_id)) {
+
+                // If this next is not in the primitive tree, we do not care
+                if (!pos.getActionsInPrimitiveTree().contains(next)) continue;
+
+                if (next.shadow_action) {
+                    // Add it as a position usig in all blanks to iterate
+                    PositionedUSig blank = PositionedUSig(layerIdx, posIdx, next);
+                    allBlanksActionToIterate.insert(blank);
+                } else {
+                    // It is a true next, add it into the next_primitive tree
+                    PositionedUSig positionUSigNext = PositionedUSig(layerIdx, posIdx, next);
+
+
+                    left.addNextsPrimitiveTree(aSig, positionUSigNext);
+
+                    // Add it as well in new nexts if the above position does not contains the action of the above does not have this 
+                    // into its nextsPrimitiveTree
+                    if (!above.getActionsInPrimitiveTree().contains(aSig) || !above.getNextsPrimitiveTree().at(aSig._unique_id).contains(positionUSigNext)) {
+                        left.addNewNextsPrimitiveTree(aSig, positionUSigNext);
+                    }
+                }
+            }
+
+            // Now, we need to iterate over all blanks action untils our set is empty
+            while (allBlanksActionToIterate.size() > 0) {
+                // Get one 
+                PositionedUSig psig = *allBlanksActionToIterate.begin();
+                allBlanksActionToIterate.erase(psig);
+                Position& position = _layers[psig.layer]->at(psig.pos);
+                Position& nextPosition = _layers[psig.layer]->at(psig.pos + 1);
+                for (USignature& next : position.getNexts().at(psig.usig._unique_id)) {
+                    
+                    // If this next is not in the primitive tree, we do not care
+                    if (!nextPosition.getActionsInPrimitiveTree().contains(next)) continue;
+
+                    if (next.shadow_action) {
+                        // Add it as a position usig in all blanks to iterate
+                        PositionedUSig blank = PositionedUSig(layerIdx, nextPosition.getPositionIndex(), next);
+                        allBlanksActionToIterate.insert(blank);
+                    } else {
+                        // It is a true next, add it into the next_primitive tree
+                        PositionedUSig positionUSigNext = PositionedUSig(layerIdx, nextPosition.getPositionIndex(), next);
+
+
+                        left.addNextsPrimitiveTree(aSig, positionUSigNext);
+
+                        // Add it as well in new nexts if the above position does not contains the action of the above does not have this 
+                        // into its nextsPrimitiveTree
+                        if (!above.getActionsInPrimitiveTree().contains(aSig) || !above.getNextsPrimitiveTree().at(aSig._unique_id).contains(positionUSigNext)) {
+                            left.addNewNextsPrimitiveTree(aSig, positionUSigNext);
+                        }
+                    } 
+                }
+            } 
+        }
+
+        // Remove all the blank action which are in the primitive tree
+        for (USignature& aSig : allBlanksActionToRemove) {
+            left.getActionsInPrimitiveTree().erase(aSig);
+        }
+    }
+}
+
 void Planner::debug_write_all_paths_in_file(Layer& layer, int layerIdx) {
     std::ofstream file;
     std::string nameFile = "all_paths_" + std::to_string(layerIdx) + ".txt";
@@ -791,6 +907,52 @@ void Planner::debug_write_all_paths_in_file(Layer& layer, int layerIdx) {
                     isAction = true;
                 }
                 file << Names::to_SMT_string(next, isAction) << "__" << nextPosString << " ";
+            }
+            file << std::endl;
+        }
+    }
+
+    file.flush();
+    file.close();
+}
+
+void Planner::debug_write_primitive_tree(Layer& layer, int layerIdx) {
+    std::ofstream file;
+    std::string nameFile = "primitive_tree_" + std::to_string(layerIdx) + ".txt";
+    file.open(nameFile);
+
+    // Iterate over all positions
+    for (int posIdx = 0; posIdx < layer.size(); posIdx++) {
+        Position& newPos = layer[posIdx]; 
+        std::string posString = std::to_string(posIdx);
+        for (USignature& aSig : newPos.getActionsInPrimitiveTree()) {
+            if (!newPos.getActionsInPrimitiveTree().contains(aSig)) continue;
+
+            file << Names::to_SMT_string(aSig, true) << "__" << posString << std::endl;
+    
+        }
+    }
+
+    file << std::endl;
+
+    // Now, make a second pass to indicate all the nexts
+    for (int posIdx = 0; posIdx < layer.size(); posIdx++) {
+        Position& newPos = layer[posIdx]; 
+        std::string posString = std::to_string(posIdx);
+        for (auto& [aSig_unique_id, nexts] : newPos.getNextsPrimitiveTree()) {
+
+            // Get the aSig
+            USignature aSig;
+            for (USignature& aSig2 : newPos.getActionsWithUniqueID()) {
+                if (aSig2._unique_id == aSig_unique_id) {
+                    aSig = aSig2;
+                    break;
+                }
+            }
+
+            file << Names::to_SMT_string(aSig, true) << "__" << posString << " ";
+            for (PositionedUSig& next : nexts) {
+                file << Names::to_SMT_string(next.usig, true) << "__" << std::to_string(next.pos) << " ";
             }
             file << std::endl;
         }
@@ -900,14 +1062,26 @@ void Planner::createNextPositionFromAbove() {
     int offset = _pos - (*_layers[_layer_idx-1]).getSuccessorPos(_old_pos);
     //eliminateInvalidParentsAtCurrentState(offset);
     if (USE_LIFTED_TREE_PATH) {
+
+        if (offset == 0) {
+            // Take the same ltp position as parent
+            Position& above = (*_layers[_layer_idx-1])[_old_pos];
+            newPos.setLtpPos(above.getLtpPos());
+        } else {
+            // Create new ltp position
+            newPos.setLtpPos(VariablePosition::nextVar());
+        }
+
+
         propagateActionsWithUniqueID(offset);
         propagateReductionsWithUniqueID(offset);
+        addPreconditionConstraintsUniqueID();
+        // addPreconditionConstraints();
     } else {
         propagateActions(offset);
         propagateReductions(offset);
+        addPreconditionConstraints();
     }
-
-    addPreconditionConstraints();
 }
 
 void Planner::createNextPositionFromLeft(Position& left) {
@@ -971,6 +1145,23 @@ void Planner::addPreconditionConstraints() {
     }
 
     for (const auto& rSig : newPos.getReductions()) {
+        // Add preconditions of reduction
+        addPreconditionsAndConstraints(rSig, _htn.getOpTable().getReduction(rSig).getPreconditions(), /*isRepetition=*/false);
+    }
+}
+
+
+void Planner::addPreconditionConstraintsUniqueID() {
+    Position& newPos = _layers[_layer_idx]->at(_pos);
+
+    for (const auto& aSig : newPos.getActionsWithUniqueID()) {
+        const Action& a = _htn.getOpTable().getAction(aSig);
+        // Add preconditions of action
+        bool isRepetition = _htn.isActionRepetition(aSig._name_id);
+        addPreconditionsAndConstraints(aSig, a.getPreconditions(), isRepetition);
+    }
+
+    for (const auto& rSig : newPos.getReductionsWithUniqueID()) {
         // Add preconditions of reduction
         addPreconditionsAndConstraints(rSig, _htn.getOpTable().getReduction(rSig).getPreconditions(), /*isRepetition=*/false);
     }
@@ -1683,13 +1874,13 @@ void Planner::propagateReductionsWithUniqueID(size_t offset) {
                     // Needs to inherit the domain from the parent
                     _htn.inheritQConstFromParent(subRSig, rSig);
                     // if (offset == 0) {
-                    //     // Inherit the substitution constrains from the parent
-                    //                     // Inherit as well all the substitution constains from the parent reduction
-                    //     if (above.getSubstitutionConstraints().count(rSig) > 0) {
-                    //         for (SubstitutionConstraint constraint : above.getSubstitutionConstraints().at(rSig)) {
-                    //             newPos.addSubstitutionConstraint(subRSig, std::move(constraint));
-                    //         }
-                    //     }
+                        // // Inherit the substitution constrains from the parent
+                        //                 // Inherit as well all the substitution constains from the parent reduction
+                        // if (above.getSubstitutionConstraints().count(rSig) > 0) {
+                        //     for (SubstitutionConstraint constraint : above.getSubstitutionConstraints().at(rSig)) {
+                        //         newPos.addSubstitutionConstraint(subRSig, std::move(constraint));
+                        //     }
+                        // }
                     // }
                 }
             }

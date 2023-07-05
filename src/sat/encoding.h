@@ -121,7 +121,7 @@ public:
 
 
 
-    void __interfaceSolver__printFormula();
+    void __interfaceSolver__printFormula(std::string filename = "");
 
 private:
     void encodeOperationVariables(Position& pos);
@@ -141,6 +141,7 @@ private:
 
     // End for lifted tree path
     void encodePrimActionTrueImpliesOneNextPrimActionIsTrue(Position& left, Position& pos);
+    void encodePrimActionTrueImpliesOneOfItsSuccessorIsTrue(Position& left, Position& pos);
 
     void encodeOperationVariables_LiftedTreePath(Position& pos);
     void encodeFactVariables_LiftedTreePath(Position& pos, Position& left, Position& above);

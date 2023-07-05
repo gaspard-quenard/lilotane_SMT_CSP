@@ -95,6 +95,7 @@ private:
     void incrementPosition();
 
     void addPreconditionConstraints();
+    void addPreconditionConstraintsUniqueID();
     void addPreconditionsAndConstraints(const USignature& op, const SigSet& preconditions, bool isActionRepetition);
     std::optional<SubstitutionConstraint> addPrecondition(const USignature& op, const Signature& fact, bool addQFact = true);
     
@@ -121,11 +122,13 @@ private:
 
 
     bool constructPrimitiveTree(Layer& layer, int layerIdx, std::vector<PositionedUSig>& intialActionsInPrimitiveTree);
+    void cleanPrimitiveTree(Layer& layer, int layerIdx);
     void computePreviousesAndNextsFlows(Layer& layer, int layerIdx);
     bool recursiveComputePrimitiveTree(USignature currentAction, Layer& layer, int posIdx, robin_hood::unordered_set<int>& actionsAlreadyVisited, robin_hood::unordered_set<int>& idActionsInPrimitiveTree);
 
     // TEST
     void debug_write_all_paths_in_file(Layer& layer, int layerIdx);
+    void debug_write_primitive_tree(Layer& layer, int layerIdx);
     // END TEST
 
 };

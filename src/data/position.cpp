@@ -10,6 +10,7 @@ IndirectFactSupportMap Position::EMPTY_INDIRECT_FACT_SUPPORT_MAP;
 Position::Position() : _layer_idx(-1), _pos(-1) {}
 void Position::setPos(size_t layerIdx, size_t pos) {_layer_idx = layerIdx; _pos = pos;}
 void Position::setAbovePos(size_t abovePos) {_above_pos = abovePos;}
+void Position::setLtpPos(size_t ltpPos) {_ltp_pos = ltpPos;}
 
 void Position::addQFact(const USignature& qfact) {
     _qfacts.insert(qfact);
@@ -180,6 +181,27 @@ void Position::addNexts(const USignature& current, const USignature& next) {
     set.insert(next);
 }
 
+void Position::addPreviousPrimitiveTree(const USignature& current, const PositionedUSig& previous) {
+    auto& set = _previous_primitive_tree[current._unique_id];
+    set.insert(previous);
+}
+
+void Position::addNextsPrimitiveTree(const USignature& current, const PositionedUSig& next) {
+    auto& set = _nexts_primitive_tree[current._unique_id];
+    set.insert(next);
+}
+
+void Position::addNewPreviousPrimitiveTree(const USignature& current, const PositionedUSig& previous) {
+    auto& set = _new_previous_primitive_tree[current._unique_id];
+    set.insert(previous);
+}
+
+void Position::addNewNextsPrimitiveTree(const USignature& current, const PositionedUSig& next) {
+    auto& set = _new_nexts_primitive_tree[current._unique_id];
+    set.insert(next);
+}
+
+
 // void Position::addLastParentMethodId(const USignature& current, int lastParentMethodId) {
 //     _last_parent_method_id[current] = lastParentMethodId;
 // }
@@ -289,6 +311,8 @@ size_t Position::getLayerIndex() const {return _layer_idx;}
 size_t Position::getPositionIndex() const {return _pos;}
 size_t Position::getAbovePositionIndex() const {return _above_pos;}
 
+size_t Position::getLtpPos() const {return _ltp_pos;}
+
 const USigSet& Position::getQFacts() const {return _qfacts;}
 const USigSet& Position::getTrueFacts() const {return _true_facts;}
 const USigSet& Position::getFalseFacts() const {return _false_facts;}
@@ -308,7 +332,7 @@ IndirectFactSupportMap& Position::getNegIndirectFactSupports() {
     if (_neg_indir_fact_supports == nullptr) return EMPTY_INDIRECT_FACT_SUPPORT_MAP;
     return *_neg_indir_fact_supports;
 }
-const NodeHashMap<USignature, std::vector<TypeConstraint>, USignatureHasher>& Position::getQConstantsTypeConstraints() const {
+const NodeHashMap<USignature, std::vector<TypeConstraint>, USignatureHasherWithUniqueID, USignatureEqualityWithUniqueID>& Position::getQConstantsTypeConstraints() const {
     return _q_constants_type_constraints;
 }
 
@@ -327,6 +351,9 @@ size_t Position::getMaxExpansionSize() const {return _max_expansion_size;}
 // TEST
 NodeHashMap<int, USigSetUniqueID>& Position::getPrevious() {return _previous;}
 NodeHashMap<int, USigSetUniqueID>& Position::getNexts() {return _nexts;}
+
+NodeHashMap<int, PositionUSigSetUniqueID>& Position::getNextsPrimitiveTree() {return _nexts_primitive_tree;}
+NodeHashMap<int, PositionUSigSetUniqueID>& Position::getNewNextsPrimitiveTree() {return _new_nexts_primitive_tree;}
 // NodeHashMap<USignature, int, USignatureHasher>& Position::getLastParentMethodId() {return _last_parent_method_id;}
 NodeHashSet<USignature, USignatureHasherWithUniqueID, USignatureEqualityWithUniqueID>& Position::getActionsInPrimitiveTree() {return _actions_in_primitive_tree;}
 // END TEST
