@@ -51,6 +51,7 @@ private:
     float _time_at_first_plan = 0;
 
     bool USE_LIFTED_TREE_PATH;
+    bool LTP_INCREMENTAL_SAT;
 
     bool _has_plan;
     Plan _plan;
@@ -70,6 +71,7 @@ public:
             _domination_resolver(_htn),
             _plan_writer(_htn, _params),
             USE_LIFTED_TREE_PATH(_params.isNonzero("useLiftedTreePathEncoder")),
+            LTP_INCREMENTAL_SAT(_params.isNonzero("ltpIncrementalSat")),
             _init_plan_time_limit(_params.getFloatParam("T")), _nonprimitive_support(_params.isNonzero("nps")), 
             _optimization_factor(_params.getFloatParam("of")), _has_plan(false) {
 

@@ -354,6 +354,8 @@ NodeHashMap<int, USigSetUniqueID>& Position::getNexts() {return _nexts;}
 
 NodeHashMap<int, PositionUSigSetUniqueID>& Position::getNextsPrimitiveTree() {return _nexts_primitive_tree;}
 NodeHashMap<int, PositionUSigSetUniqueID>& Position::getNewNextsPrimitiveTree() {return _new_nexts_primitive_tree;}
+NodeHashMap<int, PositionUSigSetUniqueID>& Position::getPreviousesPrimitiveTree() {return _previous_primitive_tree;}
+NodeHashMap<int, PositionUSigSetUniqueID>& Position::getNewPreviousesPrimitiveTree() {return _new_previous_primitive_tree;}
 // NodeHashMap<USignature, int, USignatureHasher>& Position::getLastParentMethodId() {return _last_parent_method_id;}
 NodeHashSet<USignature, USignatureHasherWithUniqueID, USignatureEqualityWithUniqueID>& Position::getActionsInPrimitiveTree() {return _actions_in_primitive_tree;}
 // END TEST

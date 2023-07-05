@@ -1040,8 +1040,14 @@ void Encoding::encode_for_lifted_tree_path(size_t layerIdx, size_t pos) {
 
     // Specific to lifted tree path
     if (pos > 0) {
-        // Indicate the fact that an action primitive is true implies one of its next actions is true
-        encodePrimActionTrueImpliesOneNextPrimActionIsTrue(left, newPos);
+        // Indicate the fact that an action primitive is true implies one of its next actions (and previous action) is true
+        if (LTP_INCREMENTAL_SAT) {
+            encodePrimActionTrueImpliesOneNextPrimActionIsTrueIncrementalSat(left, newPos);
+            encodePrimActionTrueImpliesOnePrevPrimActionIsTrueIncrementalSat(left, newPos);
+        } else {
+            encodePrimActionTrueImpliesOneNextPrimActionIsTrue(left, newPos);
+        }
+
     }
 
 
@@ -1153,6 +1159,93 @@ void Encoding::encodePrimActionTrueImpliesOneNextPrimActionIsTrue(Position& left
 
 
 
+        }
+
+        __interfaceSolver__endClause();
+    }
+}
+
+
+
+
+void Encoding::encodePrimActionTrueImpliesOneNextPrimActionIsTrueIncrementalSat(Position& left, Position& pos) {
+
+
+    // Iterate over all actions of the position in the primitive tree
+    for (USignature& aSig : left.getActionsInPrimitiveTree()) {
+
+        // Get the ID of this action
+        int aVar = _vars.getVariableUniqueID(VarType::OP, left, aSig);
+
+        __interfaceSolver__appendClause(-aVar);
+
+        if (!left.getNextsPrimitiveTree().contains(aSig._unique_id)) {
+            Log::e("Primitive action %s (%i) has no next\n", Names::to_SMT_string(aSig).c_str(), aSig._unique_id);
+            // Check if aSig is in previous of pos
+            for (USignature currentSig: pos.getActionsInPrimitiveTree()) {
+                if (pos.getPrevious().at(currentSig._unique_id).contains(aSig)) {
+                    Log::e("Primitive action %s is in previous of %s\n", Names::to_SMT_string(aSig).c_str(), Names::to_SMT_string(currentSig).c_str());
+                }
+            }
+            // continue;
+        }
+
+        // Get all the nexts of this action (which are among the current position)
+        for (PositionedUSig& nextAction :left.getNextsPrimitiveTree().at(aSig._unique_id)) {
+
+            // Get the position of the next action
+            Position& nextPos = _layers[nextAction.layer]->at(nextAction.pos);
+
+
+
+            
+            // Get the ID of this next (create if not exist)
+            int nextVar = __interfaceSolver__encodeVariable(VarType::OP, nextPos, nextAction.usig);
+            // int nextVar = _vars.getVariableUniqueID(VarType::OP, nextPos, nextAction.usig);
+
+            __interfaceSolver__appendClause(nextVar);
+        }
+
+        __interfaceSolver__endClause();
+    }
+}
+
+void Encoding::encodePrimActionTrueImpliesOnePrevPrimActionIsTrueIncrementalSat(Position& left, Position& pos) {
+
+
+    // Iterate over all actions of the position in the primitive tree
+    for (USignature& aSig : pos.getActionsInPrimitiveTree()) {
+
+        // Get the ID of this action
+        int aVar = _vars.getVariableUniqueID(VarType::OP, pos, aSig);
+
+        __interfaceSolver__appendClause(-aVar);
+
+        if (!pos.getPreviousesPrimitiveTree().contains(aSig._unique_id)) {
+            Log::e("Primitive action %s (%i) has no previouses\n", Names::to_SMT_string(aSig).c_str(), aSig._unique_id);
+            // Check if aSig is in previous of pos
+            for (USignature currentSig: pos.getActionsInPrimitiveTree()) {
+                if (left.getNexts().at(currentSig._unique_id).contains(aSig)) {
+                    Log::e("Primitive action %s is in next of %s\n", Names::to_SMT_string(aSig).c_str(), Names::to_SMT_string(currentSig).c_str());
+                }
+            }
+            // continue;
+        }
+
+        // Get all the previouses of this action (which are among the current position)
+        for (PositionedUSig& previousAction :pos.getPreviousesPrimitiveTree().at(aSig._unique_id)) {
+
+            // Get the position of the next action
+            Position& previousPos = _layers[previousAction.layer]->at(previousAction.pos);
+
+
+
+            
+            // Get the ID of this next (create if not exist)
+            int nextVar = __interfaceSolver__encodeVariable(VarType::OP, previousPos, previousAction.usig);
+            // int nextVar = _vars.getVariableUniqueID(VarType::OP, nextPos, nextAction.usig);
+
+            __interfaceSolver__appendClause(nextVar);
         }
 
         __interfaceSolver__endClause();

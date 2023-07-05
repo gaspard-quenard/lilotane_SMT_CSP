@@ -307,10 +307,12 @@ bool Planner::createNextLayer() {
 
         debug_write_all_paths_in_file(newLayer, _layer_idx);
 
-        // Remove all blank actions in the primitive tree + indicate all the new successors and predecessors of each action for this layer
-        // cleanPrimitiveTree(newLayer, _layer_idx);
 
-        debug_write_primitive_tree(newLayer, _layer_idx);
+        if (LTP_INCREMENTAL_SAT) {
+            // Remove all blank actions in the primitive tree + indicate all the new successors and predecessors of each action for this layer
+            cleanPrimitiveTree(newLayer, _layer_idx);
+            debug_write_primitive_tree(newLayer, _layer_idx);
+        }        
 
         _enc.__interfaceSolver__reset();
 
@@ -777,6 +779,8 @@ void Planner::cleanPrimitiveTree(Layer& layer, int layerIdx) {
 
         for (USignature& aSig : left.getActionsInPrimitiveTree()) {
 
+            PositionedUSig positionnedCurrent = PositionedUSig(layerIdx, posIdx - 1, aSig);
+
             if (aSig.shadow_action) {
                 allBlanksActionToRemove.insert(aSig);
                 continue;
@@ -802,10 +806,14 @@ void Planner::cleanPrimitiveTree(Layer& layer, int layerIdx) {
 
                     left.addNextsPrimitiveTree(aSig, positionUSigNext);
 
+                    // Add the previous as well
+                    pos.addPreviousPrimitiveTree(next, positionnedCurrent);
+
                     // Add it as well in new nexts if the above position does not contains the action of the above does not have this 
                     // into its nextsPrimitiveTree
                     if (!above.getActionsInPrimitiveTree().contains(aSig) || !above.getNextsPrimitiveTree().at(aSig._unique_id).contains(positionUSigNext)) {
                         left.addNewNextsPrimitiveTree(aSig, positionUSigNext);
+                        pos.addNewPreviousPrimitiveTree(next, positionnedCurrent);
                     }
                 }
             }
@@ -833,10 +841,13 @@ void Planner::cleanPrimitiveTree(Layer& layer, int layerIdx) {
 
                         left.addNextsPrimitiveTree(aSig, positionUSigNext);
 
+                        nextPosition.addPreviousPrimitiveTree(next, positionnedCurrent);
+
                         // Add it as well in new nexts if the above position does not contains the action of the above does not have this 
                         // into its nextsPrimitiveTree
                         if (!above.getActionsInPrimitiveTree().contains(aSig) || !above.getNextsPrimitiveTree().at(aSig._unique_id).contains(positionUSigNext)) {
                             left.addNewNextsPrimitiveTree(aSig, positionUSigNext);
+                            nextPosition.addNewPreviousPrimitiveTree(next, positionnedCurrent);
                         }
                     } 
                 }

@@ -330,7 +330,7 @@ std::vector<PlanItem> extractClassicalPlanLiftedTreePath(PlanExtraction mode = P
             // Get its position objects
             Position& pos = lastLayer[i];
 
-            Log::d("Action: %s\n", TOSTR(aSig));
+            Log::d("\nAction: %s [%i, %i]\n", TOSTR(aSig), pos.getLayerIndex(), pos.getPositionIndex());
 
             // Find the action with the same ID as aSig in this position
             bool found = false;
@@ -338,7 +338,10 @@ std::vector<PlanItem> extractClassicalPlanLiftedTreePath(PlanExtraction mode = P
                 // Display the action
                 if (a._unique_id == aSig._unique_id) {
                     // This is the action
-                    Log::i("  === %s\n", TOSTR(a));
+                    Log::i("  === %s(%i)\n", TOSTR(a), a._unique_id);
+                    if (a._unique_id == 65) {
+                        int dbg = 0;
+                    }
                     pos.setActionOrReductionTrue(a);
                     found = true;
                     break;
@@ -366,7 +369,7 @@ std::vector<PlanItem> extractClassicalPlanLiftedTreePath(PlanExtraction mode = P
 
                 USignature actionOrReductionTrue = *preds.begin();
 
-                // Log::i("  %s\n", TOSTR(actionOrReductionTrue));
+                Log::i("  %s(%i) at [%i,%i]\n", TOSTR(actionOrReductionTrue), actionOrReductionTrue._unique_id, currentLayer, currentPos);
 
                 if (seenLayerPositions.find(std::pair(currentLayer, currentPos)) != seenLayerPositions.end()) {
                     // This action or reduction has already been seen
@@ -388,6 +391,7 @@ std::vector<PlanItem> extractClassicalPlanLiftedTreePath(PlanExtraction mode = P
                         for (const auto& r : pos.getReductions()) {
                             Log::i("%s ", TOSTR(r));
                         }
+                        Log::i("\n");
                     }
 
                     assert(pos.getReductions().contains(actionOrReductionTrue));

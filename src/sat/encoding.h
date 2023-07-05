@@ -52,6 +52,7 @@ private:
     const bool _implicit_primitiveness;
 
     bool USE_LIFTED_TREE_PATH;
+    bool LTP_INCREMENTAL_SAT;
     bool remove_shadow_actions;
     std::set<std::vector<int>> _q_consts_at_most_one_already_added;
     FlatHashMap<int, SigSet> id_action_to_parent_method_preconditions;
@@ -70,6 +71,7 @@ public:
             _termination_callback(terminationCallback),
             _use_q_constant_mutexes(_params.getIntParam("qcm") > 0), 
             USE_LIFTED_TREE_PATH(_params.isNonzero("useLiftedTreePathEncoder")),
+            LTP_INCREMENTAL_SAT(_params.isNonzero("ltpIncrementalSat")),
             remove_shadow_actions(_params.isNonzero("useLiftedTreePathEncoder") && _params.isNonzero("removeShadowActions")),
             _implicit_primitiveness(params.isNonzero("ip")) {}
 
@@ -141,6 +143,9 @@ private:
 
     // End for lifted tree path
     void encodePrimActionTrueImpliesOneNextPrimActionIsTrue(Position& left, Position& pos);
+
+    void encodePrimActionTrueImpliesOneNextPrimActionIsTrueIncrementalSat(Position& left, Position& pos);
+    void encodePrimActionTrueImpliesOnePrevPrimActionIsTrueIncrementalSat(Position& left, Position& pos);
     void encodePrimActionTrueImpliesOneOfItsSuccessorIsTrue(Position& left, Position& pos);
 
     void encodeOperationVariables_LiftedTreePath(Position& pos);

@@ -81,6 +81,7 @@ void Parameters::setDefaults() {
 
     setParam("useLiftedTreePathEncoder", "0"); // Use lifted tree path instead of lilotane's encoding
     setParam("removeShadowActions", "0"); // When using lifted tree path, remove shadow actions (not fully functionnal, but does not seems to make a big difference)
+    setParam("ltpIncrementalSat", "0"); // When using lifted tree path, use incremental SAT solving
 }
 
 void Parameters::printUsage() {

@@ -211,6 +211,8 @@ public:
 
     NodeHashMap<int, PositionUSigSetUniqueID>& getNextsPrimitiveTree();
     NodeHashMap<int, PositionUSigSetUniqueID>& getNewNextsPrimitiveTree();
+    NodeHashMap<int, PositionUSigSetUniqueID>& getPreviousesPrimitiveTree();
+    NodeHashMap<int, PositionUSigSetUniqueID>& getNewPreviousesPrimitiveTree();
 
 
     void setActionOrReductionTrue(USignature& actionOrReduction);
